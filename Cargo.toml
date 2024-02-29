@@ -1,0 +1,17 @@
+[package]
+name = "chip8-emu"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+log = "0.4.20"
+simple_logger = "4.3"
+#byteorder = "1.5"
+#sdl2 = "0.36.0"
+
+[profile.release]
+#strip = true
+#lto = true
