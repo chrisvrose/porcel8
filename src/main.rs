@@ -1,6 +1,7 @@
 use log::LevelFilter;
 use simple_logger::SimpleLogger;
-use crate::device::{Device};
+use device::timer::Timer;
+use crate::device::Device;
 
 mod args;
 mod device;
@@ -8,5 +9,17 @@ mod device;
 fn main() {
     SimpleLogger::new().with_level(LevelFilter::Info).env().init().unwrap();
     log::info!("Started emulator");
-    let device = Device::new();
+
+    let mut timer = Timer::new();
+    timer.start();
+
+    let mut device = Device::new(timer);
+    device.set_default_font();
+    let mut i = 0;
+
+
+
 }
+
+
+
