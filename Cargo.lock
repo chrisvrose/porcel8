@@ -51,13 +51,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "chip8-emu"
-version = "0.1.0"
-dependencies = [
- "clap",
- "log",
- "simple_logger",
-]
+name = "byteorder"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "clap"
@@ -167,6 +164,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c7398b9c8b70908f6371f47ed36737907c87c52af34c268fed0bf0ceb92ead9"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "porcel8"
+version = "0.1.0"
+dependencies = [
+ "byteorder",
+ "clap",
+ "log",
+ "simple_logger",
 ]
 
 [[package]]

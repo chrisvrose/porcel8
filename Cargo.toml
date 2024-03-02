@@ -1,5 +1,5 @@
 [package]
-name = "chip8-emu"
+name = "porcel8"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,7 +9,7 @@ edition = "2021"
 clap = { version = "4.5", features = ["derive"] }
 log = "0.4.20"
 simple_logger = "4.3"
-#byteorder = "1.5"
+byteorder = "1.5"
 #sdl2 = "0.36.0"
 
 [profile.release]

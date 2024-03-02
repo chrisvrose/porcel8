@@ -1,6 +1,6 @@
-# CHIP-8 Emulator
+# PORCEL-8
 
-Chip 8 emulator made with Rust. 
+Chip 8 emulator/interpreter. 
 
 
 ### Status
@@ -13,7 +13,7 @@ Chip 8 emulator made with Rust.
 - [ ] Display
 - [ ] Keyboard
 
-### More information on Chip-8
+### More information on CHIP-8
 
 - [Guide to making a CHIP-8 emulator - Tobias V. Langhoff](https://tobiasvl.github.io/blog/write-a-chip-8-emulator/#specifications)
 - [Awesome CHIP-8](https://chip-8.github.io/links/)
