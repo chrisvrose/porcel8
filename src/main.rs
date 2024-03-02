@@ -17,8 +17,6 @@ fn main() {
     device.set_default_font();
     let mut i = 0;
 
-
-
 }
 
 

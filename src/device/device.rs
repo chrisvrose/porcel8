@@ -47,12 +47,19 @@ impl Device{
     ];
     const FONT_DEFAULT_MEM_LOCATION_START:usize = 0x50;
     const FONT_DEFAULT_MEM_LOCATION_END:usize = 0x9F;
+    const ROM_START:usize = 0x200;
     pub fn cycle(&mut self){
 
     }
 
     pub fn set_default_font(&mut self){
+        log::info!("Loaded default font from memory");
         self.memory[Self::FONT_DEFAULT_MEM_LOCATION_START..=Self::FONT_DEFAULT_MEM_LOCATION_END].copy_from_slice(&Self::DEFAULT_FONT);
+    }
+    /// load a rom from bytes
+    pub fn load_rom(&mut self,rom: &[u8]){
+        log::info!("Loaded ROM from memory");
+        self.memory[Self::ROM_START..].copy_from_slice(rom);
     }
 
 }
@@ -64,17 +71,18 @@ impl Drop for Device{
 
 pub struct RegisterFile {
     pub v: [u8; 0x10],
-    // program counter - only u12 technically.
+    /// program counter - only u12 technically.
     pub pc: u16,
     /// stack pointer
     pub i: u16,
 }
 
 impl RegisterFile {
+    pub const DEFAULT_PC_VALUE:u16 = Device::ROM_START as u16;
     pub fn new() -> RegisterFile {
         RegisterFile {
             v: [0; 0x10],
-            pc: 0x200,
+            pc: Self::DEFAULT_PC_VALUE,
             i: 0,
         }
     }
