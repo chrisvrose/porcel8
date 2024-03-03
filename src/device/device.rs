@@ -102,17 +102,17 @@ impl Device {
 
                 for i in 0..n as usize{
                     let index = Self::get_framebuffer_index(x,y+i);
-                    let slice_from_memory = self.memory[self.registers.i as usize];
+                    let slice_from_memory = self.memory[self.registers.i as usize + i];
 
                     for bit_index in (0..8).rev() {
                         // if i'm going to the next line, stop
                         if Self::get_framebuffer_index(0, y+1)==index {
                             break;
                         }
-                        let bit = (slice_from_memory & 1<<bit_index) >> bit_index;
+                        let bit = (slice_from_memory & (1<<bit_index)) >> bit_index;
 
-
-                        frame_buffer[index+(7-bit_index)] = frame_buffer[index+(7-bit_index)] ^ (bit * 0xff);
+                        let byte = bit * 0xff;
+                        frame_buffer[index+(7-bit_index)] = frame_buffer[index+(7-bit_index)] ^ (byte);
                     }
                 }
                 // TODO fix carry bit

@@ -100,7 +100,7 @@ fn main() {
 fn draw_screen(frame_buffer: MutexGuard<Box<[u8; 2048]>>, window_canvas: &mut WindowCanvas, x1: &mut Vec<u8>) {
     for (i,pixel) in frame_buffer.iter().enumerate(){
         x1[3*i] = *pixel;
-        x1[3*i+1] = *pixel;
+        x1[3*i+1] = *pixel ;
         x1[3*i+2] = *pixel;
     }
     drop(frame_buffer);
@@ -110,7 +110,7 @@ fn draw_screen(frame_buffer: MutexGuard<Box<[u8; 2048]>>, window_canvas: &mut Wi
     tex.with_lock(None,|u,i|{
         u.copy_from_slice(x1);
     }).expect("Unwrap tex");
-    window_canvas.copy(&tex,None,None);
+    window_canvas.copy(&tex,None,None).expect("Failed to set texture");
 }
 
 fn get_frame_buffer() -> Arc<Mutex<Box<[u8; 2048]>>> {
