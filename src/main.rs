@@ -140,7 +140,7 @@ fn initiate_sdl(draw_scale:f32) -> (WindowCanvas, EventPump) {
     let window_width = (Device::FRAME_BUFFER_WIDTH as f32 * draw_scale) as u32;
     let window_height = (Device::FRAME_BUFFER_HEIGHT as f32 * draw_scale) as u32;
 
-    let window = video_subsystem.window("byte-pusher-emu", window_width,window_height)
+    let window = video_subsystem.window("porcel8", window_width,window_height)
         .position_centered()
         .build()
         .unwrap();
