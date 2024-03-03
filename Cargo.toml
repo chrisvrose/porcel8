@@ -10,7 +10,7 @@ clap = { version = "4.5", features = ["derive"] }
 log = "0.4.20"
 simple_logger = "4.3"
 byteorder = "1.5"
-#sdl2 = "0.36.0"
+sdl2 = "0.36.0"
 
 [profile.release]
 #strip = true
