@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::Read;
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::mpsc::Receiver;
 use std::thread;
 use std::time::Duration;
 use log::LevelFilter;
@@ -14,10 +15,12 @@ use simple_logger::SimpleLogger;
 use device::timer::Timer;
 use crate::device::Device;
 use crate::kb_map::get_key_index;
+use crate::sdl_graphics_adapter::SdlGraphicsAdapter;
 
 mod args;
 mod device;
 mod kb_map;
+mod sdl_graphics_adapter;
 
 fn main() {
     SimpleLogger::new().with_level(LevelFilter::Info).env().init().unwrap();
@@ -26,43 +29,28 @@ fn main() {
     let mut timer = Timer::new();
     timer.start();
 
-    let frame_buffer = get_frame_buffer();
-    let frame_buffer_for_display = Arc::clone(&frame_buffer);
+    let frame_buffer_for_display = get_frame_buffer();
+    let frame_buffer_for_device = Arc::clone(&frame_buffer_for_display);
 
-    let (sender, receiver) = std::sync::mpsc::channel();
+    let (termination_signal_sender, termination_signal_sender_receiver) = std::sync::mpsc::channel();
 
     let compute_handle = thread::Builder::new().name("Compute".to_string()).spawn(move || {
-        let mut device = Device::new(timer, frame_buffer);
-        device.set_default_font();
-        {
-            let rom = load_rom();
-            device.load_rom(&rom);
-        }
-
-        loop {
-            let val = receiver.try_recv();
-            if let Ok(()) = val {
-                break;
-            } else if let Err(std::sync::mpsc::TryRecvError::Disconnected) = val {
-                panic!("Disconnected");
-            }
-            device.cycle();
-            // Put a bit of delay to slow down execution
-            thread::sleep(Duration::from_nanos(500))
-        }
+        do_device_loop(timer, frame_buffer_for_device, termination_signal_sender_receiver);
     }).expect("Failed to launch thread");
 
     let (mut canvas, mut event_pump) = initiate_sdl(8f32);
-    let mut fb_sdl = vec![0; 3 * Device::FRAME_BUFFER_SIZE];
+
+    let mut sdl_graphics_adapter = SdlGraphicsAdapter::new();
 
     canvas.set_draw_color(Color::BLACK);
     canvas.clear();
+
     'running: loop {
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit { .. } |
                 Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
-                    sender.send(()).expect("Could not send");
+                    termination_signal_sender.send(()).expect("Could not send");
                     break 'running;
                 }
                 Event::KeyDown { keycode: Some(x), repeat: false, .. } => {
@@ -83,35 +71,39 @@ fn main() {
         // The rest of the game loop goes here...
         {
             let lock = frame_buffer_for_display.lock().expect("Failed to get Display");
-            draw_screen(lock, &mut canvas, &mut fb_sdl);
-            // log::info!("Framebuffer status: {:?}",lock);
+            sdl_graphics_adapter.draw_screen(lock, &mut canvas);
         }
         canvas.present();
 
-
         // 60fps - small offset to consider for cpu cycle time
-        std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60 - 2000_000));
+        thread::sleep(Duration::new(0, 1_000_000_000u32 / 60 ));
     }
 
 
     compute_handle.join().unwrap();
 }
 
-fn draw_screen(frame_buffer: MutexGuard<Box<[u8; 2048]>>, window_canvas: &mut WindowCanvas, x1: &mut Vec<u8>) {
-    for (i, pixel) in frame_buffer.iter().enumerate() {
-        x1[3 * i] = *pixel;
-        x1[3 * i + 1] = *pixel;
-        x1[3 * i + 2] = *pixel;
+fn do_device_loop(mut timer: Timer, frame_buffer: Arc<Mutex<Box<[u8; 2048]>>>, receiver: Receiver<()>) {
+    let mut device = Device::new(timer, frame_buffer);
+    device.set_default_font();
+    {
+        let rom = load_rom();
+        device.load_rom(&rom);
     }
-    drop(frame_buffer);
 
-    let tex_creator = window_canvas.texture_creator();
-    let mut tex = tex_creator.create_texture(PixelFormatEnum::RGB24, TextureAccess::Streaming, Device::FRAME_BUFFER_WIDTH as u32, Device::FRAME_BUFFER_HEIGHT as u32).expect("Failed to create tex");
-    tex.with_lock(None, |u, i| {
-        u.copy_from_slice(x1);
-    }).expect("Unwrap tex");
-    window_canvas.copy(&tex, None, None).expect("Failed to set texture");
+    loop {
+        let val = receiver.try_recv();
+        if let Ok(()) = val {
+            break;
+        } else if let Err(std::sync::mpsc::TryRecvError::Disconnected) = val {
+            panic!("Disconnected");
+        }
+        device.cycle();
+        // Put a bit of delay to slow down execution
+        thread::sleep(Duration::from_nanos(500))
+    }
 }
+
 
 fn get_frame_buffer() -> Arc<Mutex<Box<[u8; 2048]>>> {
     Arc::new(Mutex::new(vec![0u8; Device::FRAME_BUFFER_SIZE].into_boxed_slice().try_into().unwrap()))
