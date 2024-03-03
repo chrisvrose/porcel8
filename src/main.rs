@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::Read;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::time::Duration;
 use log::LevelFilter;
@@ -8,8 +8,8 @@ use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::event::Event;
 use sdl2::EventPump;
 use sdl2::keyboard::Keycode;
-use sdl2::pixels::Color;
-use sdl2::render::{BlendMode, WindowCanvas};
+use sdl2::pixels::{Color, PixelFormatEnum};
+use sdl2::render::{BlendMode, TextureAccess, WindowCanvas};
 use simple_logger::SimpleLogger;
 use device::timer::Timer;
 use crate::device::Device;
@@ -51,7 +51,8 @@ fn main() {
         }
     });
 
-    let (mut canvas, mut event_pump) = initiate_sdl(2f32);
+    let (mut canvas, mut event_pump) = initiate_sdl(8f32);
+    let mut fb_sdl = vec![0;3*Device::FRAME_BUFFER_SIZE];
 
     canvas.set_draw_color(Color::BLACK);
     canvas.clear();
@@ -81,7 +82,8 @@ fn main() {
         // The rest of the game loop goes here...
         {
             let lock =  frame_buffer_for_display.lock().expect("Failed to get Display");
-            log::info!("Framebuffer status: {:?}",lock);
+            draw_screen(lock,&mut canvas,&mut fb_sdl);
+            // log::info!("Framebuffer status: {:?}",lock);
         }
         canvas.present();
 
@@ -93,6 +95,22 @@ fn main() {
 
     compute_handle.join().unwrap();
 
+}
+
+fn draw_screen(frame_buffer: MutexGuard<Box<[u8; 2048]>>, window_canvas: &mut WindowCanvas, x1: &mut Vec<u8>) {
+    for (i,pixel) in frame_buffer.iter().enumerate(){
+        x1[3*i] = *pixel;
+        x1[3*i+1] = *pixel;
+        x1[3*i+2] = *pixel;
+    }
+    drop(frame_buffer);
+
+    let tex_creator = window_canvas.texture_creator();
+    let mut tex = tex_creator.create_texture(PixelFormatEnum::RGB24, TextureAccess::Streaming, Device::FRAME_BUFFER_WIDTH as u32, Device::FRAME_BUFFER_HEIGHT as u32).expect("Failed to create tex");
+    tex.with_lock(None,|u,i|{
+        u.copy_from_slice(x1);
+    }).expect("Unwrap tex");
+    window_canvas.copy(&tex,None,None);
 }
 
 fn get_frame_buffer() -> Arc<Mutex<Box<[u8; 2048]>>> {

@@ -60,8 +60,13 @@ impl Device {
         let pc = self.registers.pc as usize;
         let instr_slice = self.memory.get(pc..pc + 2).expect("Failed to get memory");
         self.registers.pc += 2;
+
         let instruction = Instruction::decode_instruction(instr_slice);
         self.execute_instruction(instruction);
+
+    }
+    pub fn get_framebuffer_index(x:usize,y:usize)->usize{
+        y*Self::FRAME_BUFFER_WIDTH + x
     }
     pub fn execute_instruction(&mut self, instruction: Instruction) {
         // thread::sleep(Duration::from_millis(250));
@@ -71,6 +76,10 @@ impl Device {
                 log::info!("Executing passthrough");
             }
             Instruction::ClearScreen => {
+                let mut frame_buffer = self.frame_buffer.lock().expect("Failed to grab framebuffer for drawing");
+                for pixel in frame_buffer.iter_mut(){
+                    *pixel = 0;
+                }
                 log::info!("ClearScreen")
             }
             Instruction::JumpTo(new_pc) => {
@@ -83,10 +92,31 @@ impl Device {
                 self.registers.v[reg_location] += value;
             }
             Instruction::SetIndex(value) => {
+                log::info!("Setting index to {}",value);
                 self.registers.i = value;
             }
-            Instruction::Draw(x, y, n) => {
-                let frame_buffer = self.frame_buffer.lock();
+            Instruction::Draw(regx,regy, n) => {
+                let mut frame_buffer = self.frame_buffer.lock().expect("Failed to grab framebuffer for drawing");
+                let x = self.registers.v[regx] as usize;
+                let y = self.registers.v[regy] as usize;
+
+                for i in 0..n as usize{
+                    let index = Self::get_framebuffer_index(x,y+i);
+                    let slice_from_memory = self.memory[self.registers.i as usize];
+
+                    for bit_index in (0..8).rev() {
+                        // if i'm going to the next line, stop
+                        if Self::get_framebuffer_index(0, y+1)==index {
+                            break;
+                        }
+                        let bit = (slice_from_memory & 1<<bit_index) >> bit_index;
+
+
+                        frame_buffer[index+(7-bit_index)] = frame_buffer[index+(7-bit_index)] ^ (bit * 0xff);
+                    }
+                }
+                // TODO fix carry bit
+                log::info!("Drawing at ({},{}) for {} pixels from {}",x,y,n,self.registers.i);
                 log::warn!("Draw call unimplemented");
             }
         };
