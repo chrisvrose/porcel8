@@ -29,11 +29,10 @@ fn main() {
     let frame_buffer = get_frame_buffer();
     let frame_buffer_for_display = Arc::clone(&frame_buffer);
 
-    let (sender,receiver) = std::sync::mpsc::channel();
+    let (sender, receiver) = std::sync::mpsc::channel();
 
-    let compute_handle = thread::spawn(move ||{
-
-    let mut device = Device::new(timer, frame_buffer);
+    let compute_handle = thread::Builder::new().name("Compute".to_string()).spawn(move || {
+        let mut device = Device::new(timer, frame_buffer);
         device.set_default_font();
         {
             let rom = load_rom();
@@ -42,17 +41,19 @@ fn main() {
 
         loop {
             let val = receiver.try_recv();
-            if let Ok(()) = val{
+            if let Ok(()) = val {
                 break;
-            }else if let Err(std::sync::mpsc::TryRecvError::Disconnected) = val{
+            } else if let Err(std::sync::mpsc::TryRecvError::Disconnected) = val {
                 panic!("Disconnected");
             }
             device.cycle();
+            // Put a bit of delay to slow down execution
+            thread::sleep(Duration::from_nanos(500))
         }
-    });
+    }).expect("Failed to launch thread");
 
     let (mut canvas, mut event_pump) = initiate_sdl(8f32);
-    let mut fb_sdl = vec![0;3*Device::FRAME_BUFFER_SIZE];
+    let mut fb_sdl = vec![0; 3 * Device::FRAME_BUFFER_SIZE];
 
     canvas.set_draw_color(Color::BLACK);
     canvas.clear();
@@ -81,8 +82,8 @@ fn main() {
 
         // The rest of the game loop goes here...
         {
-            let lock =  frame_buffer_for_display.lock().expect("Failed to get Display");
-            draw_screen(lock,&mut canvas,&mut fb_sdl);
+            let lock = frame_buffer_for_display.lock().expect("Failed to get Display");
+            draw_screen(lock, &mut canvas, &mut fb_sdl);
             // log::info!("Framebuffer status: {:?}",lock);
         }
         canvas.present();
@@ -94,39 +95,38 @@ fn main() {
 
 
     compute_handle.join().unwrap();
-
 }
 
 fn draw_screen(frame_buffer: MutexGuard<Box<[u8; 2048]>>, window_canvas: &mut WindowCanvas, x1: &mut Vec<u8>) {
-    for (i,pixel) in frame_buffer.iter().enumerate(){
-        x1[3*i] = *pixel;
-        x1[3*i+1] = *pixel ;
-        x1[3*i+2] = *pixel;
+    for (i, pixel) in frame_buffer.iter().enumerate() {
+        x1[3 * i] = *pixel;
+        x1[3 * i + 1] = *pixel;
+        x1[3 * i + 2] = *pixel;
     }
     drop(frame_buffer);
 
     let tex_creator = window_canvas.texture_creator();
     let mut tex = tex_creator.create_texture(PixelFormatEnum::RGB24, TextureAccess::Streaming, Device::FRAME_BUFFER_WIDTH as u32, Device::FRAME_BUFFER_HEIGHT as u32).expect("Failed to create tex");
-    tex.with_lock(None,|u,i|{
+    tex.with_lock(None, |u, i| {
         u.copy_from_slice(x1);
     }).expect("Unwrap tex");
-    window_canvas.copy(&tex,None,None).expect("Failed to set texture");
+    window_canvas.copy(&tex, None, None).expect("Failed to set texture");
 }
 
 fn get_frame_buffer() -> Arc<Mutex<Box<[u8; 2048]>>> {
     Arc::new(Mutex::new(vec![0u8; Device::FRAME_BUFFER_SIZE].into_boxed_slice().try_into().unwrap()))
 }
 
-const ROM_SIZE:usize = 4096 - 0x200;
-fn load_rom()->[u8;ROM_SIZE]{
-    let mut rom_slice = [0u8;ROM_SIZE];
+const ROM_SIZE: usize = 4096 - 0x200;
+
+fn load_rom() -> [u8; ROM_SIZE] {
+    let mut rom_slice = [0u8; ROM_SIZE];
     let mut file = File::open("roms/ibm_logo.ch8").expect("could not open");
     file.read(&mut rom_slice).expect("Unwrap");
     rom_slice
-
 }
 
-fn initiate_sdl(draw_scale:f32) -> (WindowCanvas, EventPump) {
+fn initiate_sdl(draw_scale: f32) -> (WindowCanvas, EventPump) {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
     // let audio_subsystem = sdl_context.audio().unwrap();
@@ -140,7 +140,7 @@ fn initiate_sdl(draw_scale:f32) -> (WindowCanvas, EventPump) {
     let window_width = (Device::FRAME_BUFFER_WIDTH as f32 * draw_scale) as u32;
     let window_height = (Device::FRAME_BUFFER_HEIGHT as f32 * draw_scale) as u32;
 
-    let window = video_subsystem.window("porcel8", window_width,window_height)
+    let window = video_subsystem.window("porcel8", window_width, window_height)
         .position_centered()
         .build()
         .unwrap();

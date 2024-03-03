@@ -64,6 +64,7 @@ impl Device {
         let instruction = Instruction::decode_instruction(instr_slice);
         self.execute_instruction(instruction);
 
+
     }
     pub fn get_framebuffer_index(x:usize,y:usize)->usize{
         y*Self::FRAME_BUFFER_WIDTH + x
@@ -80,9 +81,10 @@ impl Device {
                 for pixel in frame_buffer.iter_mut(){
                     *pixel = 0;
                 }
-                log::info!("ClearScreen")
+                log::trace!("ClearScreen")
             }
             Instruction::JumpTo(new_pc) => {
+                // hint that we're jumping back to self
                 self.registers.pc = new_pc;
             }
             Instruction::SetRegister(reg_location, value) => {
@@ -92,7 +94,6 @@ impl Device {
                 self.registers.v[reg_location] += value;
             }
             Instruction::SetIndex(value) => {
-                log::info!("Setting index to {}",value);
                 self.registers.i = value;
             }
             Instruction::Draw(regx,regy, n) => {
@@ -116,8 +117,7 @@ impl Device {
                     }
                 }
                 // TODO fix carry bit
-                log::info!("Drawing at ({},{}) for {} pixels from {}",x,y,n,self.registers.i);
-                log::warn!("Draw call unimplemented");
+                log::warn!("Draw call incomplete");
             }
         };
     }
