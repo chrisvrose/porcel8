@@ -6,13 +6,20 @@ Chip 8 emulator/interpreter.
 ### Status
 
 - [X] Memory
-- [ ] Loading font
+- [X] Timer
+- [X] Loading font
   - [X] Default font
-  - [ ] Custom font
+  - [ ] ~~Custom font~~ Future
 - [X] Registers
-- [ ] Stack
-- [ ] Instruction Processing
+- [X] Stack
 - [X] Display
+- [ ] Instruction Processing
+  - [X] Bare requirements for IBM Logo
+  - [ ] ALU operations
+  - [ ] Procedure related
+  - [ ] Timer
+  - [ ] Super chip8 compatibility.
+- [ ] Audio
 - [ ] Keyboard
 
 ### More information on CHIP-8
