@@ -14,7 +14,8 @@ pub struct Device {
     pub memory: Box<[u8; Self::DEVICE_MEMORY_SIZE]>,
     pub timer: Timer,
     pub stack: Vec<u16>,
-    pub frame_buffer: Arc<Mutex<Box<[bool;64*32]>>>
+    pub frame_buffer: Arc<Mutex<Box<[bool;64*32]>>>,
+    pub super_chip8_mode: bool
 }
 
 impl Device {
@@ -31,6 +32,7 @@ impl Device {
             frame_buffer: fb,
             stack: Vec::with_capacity(16),
             timer,
+            super_chip8_mode: false
         }
     }
 }
