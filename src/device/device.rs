@@ -120,14 +120,37 @@ impl Device {
             Instruction::RandomOr(_, _) => {}
             Instruction::SkipIfKeyPressed(_) => {}
             Instruction::SkipIfKeyNotPressed(_) => {}
-            Instruction::Set(_, _) => {}
-            Instruction::Or(_, _) => {}
-            Instruction::And(_, _) => {}
-            Instruction::Xor(_, _) => {}
-            Instruction::Add(_, _) => {}
-            Instruction::Sub(_, _) => {}
+            Instruction::Set(x, y) => {
+                self.registers.v[x] = self.registers.v[y];
+            }
+            Instruction::Or(x, y) => {
+                self.registers.v[x] |= self.registers.v[y];
+            }
+            Instruction::And(x,y) => {
+                self.registers.v[x] &= self.registers.v[y];
+            }
+            Instruction::Xor(x,y) => {
+                self.registers.v[x] ^= self.registers.v[y];
+            }
+            Instruction::Add(x,y) => {
+                let left = self.registers.v[x];
+                let (wrapped_addition_result, is_overflow) = left.overflowing_add(self.registers.v[y]);
+                self.registers.v[x] = wrapped_addition_result;
+                self.set_flag_register(is_overflow);
+            }
+            Instruction::Sub(x,y) => {
+                let left = self.registers.v[x];
+                let (wrapped_subtraction_result, is_overflow) = left.overflowing_sub(self.registers.v[y]);
+                self.registers.v[x] = wrapped_subtraction_result;
+                self.set_flag_register(is_overflow);
+            }
             Instruction::RShift(_, _) => {}
-            Instruction::RSub(_, _) => {}
+            Instruction::RSub(x, y) => {
+                let left = self.registers.v[y];
+                let (wrapped_subtraction_result, is_overflow) = left.overflowing_sub(self.registers.v[x]);
+                self.registers.v[x] = wrapped_subtraction_result;
+                self.set_flag_register(is_overflow);
+            }
             Instruction::LShift(_, _) => {}
         };
     }
