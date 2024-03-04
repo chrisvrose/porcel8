@@ -27,32 +27,36 @@ pub enum Instruction {
     /// ANNN - Set index value
     SetIndex(u16),
     /// B(X+N)NN - Jump to address with offset. Either v0 or specified register 
-    JumpWithOffset(usize,u16),
+    JumpWithOffset(usize, u16),
     /// CXNN - AND a random number with NN and place in register
-    RandomOr(usize,u16),
+    RandomOr(usize, u16),
     /// DXYN - Draw pixels at xy pointed by register for n bytes long
     Draw(usize, usize, u8),
 
+    /// EX9E - Check if key is pressed 
+    SkipIfKeyPressed(usize),
+    /// EXA1 - Check if key is not pressed
+    SkipIfKeyNotPressed(usize),
 
     // ALU operations going ahead
     /// 8XY0 - x=y
-    Set(usize,usize),
+    Set(usize, usize),
     /// 8XY1 - x|=y
-    Or(usize,usize),
+    Or(usize, usize),
     /// 8XY2 - x|=y
-    And(usize,usize),
+    And(usize, usize),
     /// 8XY3 - x^=y
-    Xor(usize,usize),
+    Xor(usize, usize),
     /// 8XY4 - x+=y
-    Add(usize,usize),
+    Add(usize, usize),
     /// 8XY5 - x-=y
-    Sub(usize,usize),
+    Sub(usize, usize),
     /// 8XY6 - (x=y)?, x>>=1
-    RShift(usize,usize),
+    RShift(usize, usize),
     /// 8XY7 - x=y-x
-    RSub(usize,usize),
+    RSub(usize, usize),
     /// 8XYE - (x=y)?, x<<=1
-    LShift(usize,usize),
+    LShift(usize, usize),
 }
 
 impl Instruction {
@@ -98,11 +102,11 @@ impl Instruction {
             }
             0x7 => {
                 Instruction::AddValueToRegister(((instruction & 0x0f00) >> 8) as usize, (instruction & 0xff) as u8)
-            },
-            0x8=>{
+            }
+            0x8 => {
                 Self::decode_arithmetic_instruction(instruction)
             }
-            0x9 =>{
+            0x9 => {
                 let register_x = (instruction & 0xf00) >> 8;
                 let register_y = (instruction & 0xf0) >> 4;
 
@@ -111,15 +115,15 @@ impl Instruction {
             0xA => {
                 Instruction::SetIndex(instruction & 0xfff)
             }
-            0xB =>{
+            0xB => {
                 let register_x = (instruction & 0xf00) >> 8;
                 let jump_address_base = instruction & 0xfff;
                 Instruction::JumpWithOffset(register_x as usize, jump_address_base)
             }
-            0xC =>{
+            0xC => {
                 let register_x = (instruction & 0xf00) >> 8;
                 let mask = instruction & 0xff;
-                Instruction::RandomOr(register_x as usize,mask)
+                Instruction::RandomOr(register_x as usize, mask)
             }
             0xD => {
                 let x = (instruction & 0xf00) >> 8;
@@ -127,46 +131,54 @@ impl Instruction {
                 let n = instruction & 0xf;
                 Instruction::Draw(x as usize, y as usize, n as u8)
             }
+            0xE if (instruction & 0xff) == 0x9e => {
+                let x = (instruction & 0xf00) >> 8;
+                Instruction::SkipIfKeyPressed(x as usize)
+            },
+            0xE if (instruction  & 0xff) == 0xa1 => {
+                let x = (instruction & 0xf00) >> 8;
+                Instruction::SkipIfKeyNotPressed(x as usize)
+            }   
             _ => {
                 todo!("Unimplemented instruction")
             }
         }
     }
 
-    fn decode_arithmetic_instruction(instruction: u16) ->Instruction{
-        assert_eq!(instruction&0xF000,0x8000);
-        let reg_x = ((instruction & 0xf00 )>>8) as usize;
+    fn decode_arithmetic_instruction(instruction: u16) -> Instruction {
+        assert_eq!(instruction & 0xF000, 0x8000);
+        let reg_x = ((instruction & 0xf00) >> 8) as usize;
         let reg_y = ((instruction & 0xf0) >> 4) as usize;
         let operation = instruction & 0xf;
         match operation {
-            0=>{
-                Instruction::Set(reg_x,reg_y)
-            },
-            1=>{
-                Instruction::Or(reg_x,reg_y)
-            },
-            2=>{
-                Instruction::And(reg_x,reg_y)
-            },
-            3=>{
-                Instruction::Xor(reg_x,reg_y)
-            },
-            4=>{
-                Instruction::Add(reg_x,reg_y)
-            },
-            5=>{
-                Instruction::Sub(reg_x,reg_y)
-            },
-            6=>{
-                Instruction::RShift(reg_x,reg_y)
+            0 => {
+                Instruction::Set(reg_x, reg_y)
             }
-            7=>{
-                Instruction::RSub(reg_x,reg_y)
-            },
-            0xe=>{
-                Instruction::LShift(reg_x,reg_y)
+            1 => {
+                Instruction::Or(reg_x, reg_y)
             }
-            _=>{
+            2 => {
+                Instruction::And(reg_x, reg_y)
+            }
+            3 => {
+                Instruction::Xor(reg_x, reg_y)
+            }
+            4 => {
+                Instruction::Add(reg_x, reg_y)
+            }
+            5 => {
+                Instruction::Sub(reg_x, reg_y)
+            }
+            6 => {
+                Instruction::RShift(reg_x, reg_y)
+            }
+            7 => {
+                Instruction::RSub(reg_x, reg_y)
+            }
+            0xe => {
+                Instruction::LShift(reg_x, reg_y)
+            }
+            _ => {
                 log::error!("Encountered unexpected alu instruction {}",instruction);
                 Instruction::PassThrough
             }
@@ -265,6 +277,7 @@ mod tests {
         let ins = Instruction::decode_instruction(&instruction_bytes);
         assert_eq!(ins, AddValueToRegister(15, 0x23));
     }
+
     #[test]
     fn test_conditional_register_in_equal_skip() {
         let instruction_bytes = 0x9af0_u16.to_be_bytes();
@@ -278,22 +291,21 @@ mod tests {
         let ins = Instruction::decode_instruction(&instruction_bytes);
         assert_eq!(ins, SetIndex(0xfaf));
     }
+
     #[test]
     fn test_jump_with_offset() {
         let instruction_bytes = 0xbfae_u16.to_be_bytes();
         let ins = Instruction::decode_instruction(&instruction_bytes);
-        assert_eq!(ins, JumpWithOffset(0xf,0xfae));
+        assert_eq!(ins, JumpWithOffset(0xf, 0xfae));
     }
 
     #[test]
     fn test_random_and() {
         let instruction_bytes = 0xcabd_u16.to_be_bytes();
         let ins = Instruction::decode_instruction(&instruction_bytes);
-        assert_eq!(ins, RandomOr(0xa,0xbd));
+        assert_eq!(ins, RandomOr(0xa, 0xbd));
     }
-    
-    
-    
+
 
     #[test]
     fn test_draw() {
@@ -303,57 +315,78 @@ mod tests {
     }
 
     #[test]
-    fn test_alu_set(){
+    fn test_alu_set() {
         let instruction_bytes = 0x8a50_u16.to_be_bytes();
         let ins = Instruction::decode_instruction(&instruction_bytes);
-        assert_eq!(ins, Set(0xa,0x5))
+        assert_eq!(ins, Set(0xa, 0x5))
     }
+
     #[test]
-    fn test_alu_or(){
+    fn test_alu_or() {
         let instruction_bytes = 0x85a1_u16.to_be_bytes();
         let ins = Instruction::decode_instruction(&instruction_bytes);
-        assert_eq!(ins, Or(0x5,0xa))
+        assert_eq!(ins, Or(0x5, 0xa))
     }
+
     #[test]
-    fn test_alu_and(){
+    fn test_alu_and() {
         let instruction_bytes = 0x8ba2_u16.to_be_bytes();
         let ins = Instruction::decode_instruction(&instruction_bytes);
-        assert_eq!(ins, And(0xb,0xa))
+        assert_eq!(ins, And(0xb, 0xa))
     }
+
     #[test]
-    fn test_alu_xor(){
+    fn test_alu_xor() {
         let instruction_bytes = 0x8ab3_u16.to_be_bytes();
         let ins = Instruction::decode_instruction(&instruction_bytes);
-        assert_eq!(ins, Xor(0xa,0xb))
+        assert_eq!(ins, Xor(0xa, 0xb))
     }
+
     #[test]
-    fn test_alu_add(){
+    fn test_alu_add() {
         let instruction_bytes = 0x8ed4_u16.to_be_bytes();
         let ins = Instruction::decode_instruction(&instruction_bytes);
-        assert_eq!(ins, Add(0xe,0xd))
+        assert_eq!(ins, Add(0xe, 0xd))
     }
+
     #[test]
-    fn test_alu_sub(){
+    fn test_alu_sub() {
         let instruction_bytes = 0x8ed5_u16.to_be_bytes();
         let ins = Instruction::decode_instruction(&instruction_bytes);
-        assert_eq!(ins, Sub(0xe,0xd))
+        assert_eq!(ins, Sub(0xe, 0xd))
     }
+
     #[test]
-    fn test_alu_r_sub(){
+    fn test_alu_r_sub() {
         let instruction_bytes = 0x8517_u16.to_be_bytes();
         let ins = Instruction::decode_instruction(&instruction_bytes);
-        assert_eq!(ins, RSub(0x5,0x1))
+        assert_eq!(ins, RSub(0x5, 0x1))
     }
+
     #[test]
-    fn test_alu_right_shift(){
+    fn test_alu_right_shift() {
         let instruction_bytes = 0x89a6_u16.to_be_bytes();
         let ins = Instruction::decode_instruction(&instruction_bytes);
-        assert_eq!(ins, RShift(0x9,0xa))
+        assert_eq!(ins, RShift(0x9, 0xa))
     }
+
     #[test]
-    fn test_alu_left_shift(){
+    fn test_alu_left_shift() {
         let instruction_bytes = 0x812e_u16.to_be_bytes();
         let ins = Instruction::decode_instruction(&instruction_bytes);
-        assert_eq!(ins, LShift(0x1,0x2))
+        assert_eq!(ins, LShift(0x1, 0x2))
     }
+    #[test]
+    fn test_skip_if_keypress(){
+        let instruction_bytes = 0xef9e_u16.to_be_bytes();
+        let ins = Instruction::decode_instruction(&instruction_bytes);
+        assert_eq!(ins, SkipIfKeyPressed(0xf))
+    }
+    #[test]
+    fn test_skip_if_not_keypress(){
+        let instruction_bytes = 0xeba1_u16.to_be_bytes();
+        let ins = Instruction::decode_instruction(&instruction_bytes);
+        assert_eq!(ins, SkipIfKeyNotPressed(0xb))
+    }
+    
 }

@@ -103,9 +103,32 @@ impl Device {
                 let toggle_state = self.draw_sprite_at_location(x, y, n);
                 self.set_flag_register(toggle_state);
             },
-            remaining=>{
-                log::error!("Unimplemented instruction {:?}",remaining);
+            Instruction::JumpAndLink(jump_location) => {
+                self.stack.push(self.registers.pc);
+                self.registers.pc = jump_location;
             }
+            Instruction::ReturnFromProcedure =>{
+                let old_pc = self.stack.pop().expect("Expected value on stack pop");
+                self.registers.pc = old_pc;
+            }
+
+            Instruction::ConditionalEqSkipNext(_, _) => {}
+            Instruction::ConditionalInEqSkipNext(_, _) => {}
+            Instruction::ConditionalEqRegisterSkipNext(_, _) => {}
+            Instruction::ConditionalInEqRegisterSkipNext(_, _) => {}
+            Instruction::JumpWithOffset(_, _) => {}
+            Instruction::RandomOr(_, _) => {}
+            Instruction::SkipIfKeyPressed(_) => {}
+            Instruction::SkipIfKeyNotPressed(_) => {}
+            Instruction::Set(_, _) => {}
+            Instruction::Or(_, _) => {}
+            Instruction::And(_, _) => {}
+            Instruction::Xor(_, _) => {}
+            Instruction::Add(_, _) => {}
+            Instruction::Sub(_, _) => {}
+            Instruction::RShift(_, _) => {}
+            Instruction::RSub(_, _) => {}
+            Instruction::LShift(_, _) => {}
         };
     }
     ///
