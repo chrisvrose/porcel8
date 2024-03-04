@@ -11,6 +11,7 @@ log = "0.4.20"
 simple_logger = "4.3"
 byteorder = "1.5"
 sdl2 = "0.36.0"
+rand = "0.8.5"
 
 [profile.release]
 strip = true

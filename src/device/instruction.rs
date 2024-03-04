@@ -29,7 +29,7 @@ pub enum Instruction {
     /// B(X+N)NN - Jump to address with offset. Either v0 or specified register 
     JumpWithOffset(usize, u16),
     /// CXNN - AND a random number with NN and place in register
-    RandomOr(usize, u16),
+    RandomAnd(usize, u8),
     /// DXYN - Draw pixels at xy pointed by register for n bytes long
     Draw(usize, usize, u8),
 
@@ -123,7 +123,7 @@ impl Instruction {
             0xC => {
                 let register_x = (instruction & 0xf00) >> 8;
                 let mask = instruction & 0xff;
-                Instruction::RandomOr(register_x as usize, mask)
+                Instruction::RandomAnd(register_x as usize, mask as u8)
             }
             0xD => {
                 let x = (instruction & 0xf00) >> 8;
@@ -303,7 +303,7 @@ mod tests {
     fn test_random_and() {
         let instruction_bytes = 0xcabd_u16.to_be_bytes();
         let ins = Instruction::decode_instruction(&instruction_bytes);
-        assert_eq!(ins, RandomOr(0xa, 0xbd));
+        assert_eq!(ins, RandomAnd(0xa, 0xbd));
     }
 
 

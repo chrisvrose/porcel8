@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::thread::{JoinHandle, sleep};
 use std::time::Duration;
+use rand::random;
 use crate::device::instruction::Instruction;
 use crate::device::timer::Timer;
 
@@ -117,7 +118,9 @@ impl Device {
             Instruction::ConditionalEqRegisterSkipNext(_, _) => {}
             Instruction::ConditionalInEqRegisterSkipNext(_, _) => {}
             Instruction::JumpWithOffset(_, _) => {}
-            Instruction::RandomOr(_, _) => {}
+            Instruction::RandomAnd(dest, n) => {
+                self.registers.v[dest] = random::<u8>() & n;
+            }
             Instruction::SkipIfKeyPressed(_) => {}
             Instruction::SkipIfKeyNotPressed(_) => {}
             Instruction::Set(x, y) => {
