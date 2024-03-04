@@ -13,5 +13,5 @@ byteorder = "1.5"
 sdl2 = "0.36.0"
 
 [profile.release]
-#strip = true
-#lto = true
+strip = true
+lto = true
