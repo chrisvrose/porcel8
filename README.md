@@ -5,12 +5,14 @@ Chip 8 emulator/interpreter.
 
 ### Status
 
-- [ ] Memory
-- [ ] Loading fonts
-- [ ] Registers
+- [X] Memory
+- [ ] Loading font
+  - [X] Default font
+  - [ ] Custom font
+- [X] Registers
 - [ ] Stack
 - [ ] Instruction Processing
-- [ ] Display
+- [X] Display
 - [ ] Keyboard
 
 ### More information on CHIP-8
