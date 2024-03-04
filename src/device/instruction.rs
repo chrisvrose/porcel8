@@ -26,8 +26,29 @@ pub enum Instruction {
     ConditionalInEqRegisterSkipNext(usize, usize),
     /// ANNN - Set index value
     SetIndex(u16),
-    ///
+    /// DXYN - Draw pixels at xy pointed by register for n bytes long
     Draw(usize, usize, u8),
+    
+    
+    // ALU operations going ahead
+    /// 8XY0 - x=y
+    Set(usize,usize),
+    /// 8XY1 - x|=y
+    Or(usize,usize),
+    /// 8XY2 - x|=y
+    And(usize,usize),
+    /// 8XY3 - x^=y
+    Xor(usize,usize),
+    /// 8XY4 - x+=y
+    Add(usize,usize),
+    /// 8XY5 - x-=y
+    Sub(usize,usize),
+    /// 8XY6 - (x=y)?, x>>=1 
+    RShift(usize,usize),
+    /// 8XY7 - x=y-x
+    RSub(usize,usize),
+    /// 8XYE - (x=y)?, x<<=1
+    LShift(usize,usize),
 }
 
 impl Instruction {
