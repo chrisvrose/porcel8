@@ -102,6 +102,9 @@ impl Device {
                 let y = self.registers.v[regy] as usize;
                 let toggle_state = self.draw_sprite_at_location(x, y, n);
                 self.set_flag_register(toggle_state);
+            },
+            remaining=>{
+                log::error!("Unimplemented instruction {:?}",remaining);
             }
         };
     }
@@ -124,7 +127,7 @@ impl Device {
                 let bit_is_true = (slice_from_memory & (1 << bit_index)) == (1<<bit_index) ;
 
                 // if the pixel is going to be toggled false, set this flag bit to true
-                if(frame_buffer[index + (7 - bit_index)] && (bit_is_true)) { is_pixel_toggled_off = true;}
+                if frame_buffer[index + (7 - bit_index)] && (bit_is_true) { is_pixel_toggled_off = true;}
                 frame_buffer[index + (7 - bit_index)] = frame_buffer[index + (7 - bit_index)] ^ (bit_is_true);
             }
         }

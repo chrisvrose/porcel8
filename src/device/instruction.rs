@@ -1,5 +1,4 @@
 use byteorder::{BigEndian, ByteOrder};
-use crate::device::instruction::Instruction::{AddValueToRegister, ClearScreen, Draw, JumpTo, PassThrough, SetIndex, SetRegister};
 
 #[derive(Eq, PartialEq, Debug)]
 pub enum Instruction {
@@ -7,12 +6,24 @@ pub enum Instruction {
     PassThrough,
     /// 00E0 - Clear the screen
     ClearScreen,
+    /// 00EE - Return from procedure
+    ReturnFromProcedure,
     /// 1NNN - Jump to location
     JumpTo(u16),
+    /// 2NNN - Link and jump
+    JumpAndLink(u16),
+    /// 3XNN - If register equals number, Skip next
+    ConditionalEqSkipNext(usize, u8),
+    /// 4XNN - If register equals number, Skip next
+    ConditionalInEqSkipNext(usize, u8),
+    /// 5XY0 - If registers equal, Skip next
+    ConditionalEqRegisterSkipNext(usize, usize),
     /// 6XNN - Set register to value
     SetRegister(usize, u8),
     /// 7XNN - Add value to register
     AddValueToRegister(usize, u8),
+    /// 9XY0 - If registers not equal, skip next
+    ConditionalInEqRegisterSkipNext(usize, usize),
     /// ANNN - Set index value
     SetIndex(u16),
     ///
@@ -26,29 +37,57 @@ impl Instruction {
         let outer_instruction_nibble = (instruction & 0xF000) >> 12;
         match outer_instruction_nibble {
             0x0 if instruction == 0xe0 => {
-                ClearScreen
+                Instruction::ClearScreen
+            }
+            0x0 if instruction == 0xee => {
+                Instruction::ReturnFromProcedure
             }
             0x0 => {
                 log::warn!("Ignoring unsupported instruction {}",instruction);
-                PassThrough
+                Instruction::PassThrough
             }
             0x1 => {
-                JumpTo(instruction & 0xfff)
+                Instruction::JumpTo(instruction & 0xfff)
+            }
+            0x2 => {
+                Instruction::JumpAndLink(instruction & 0xfff)
+            }
+            0x3 => {
+                let register = (instruction & 0xf00) >> 8;
+                let val = instruction & 0xff;
+                Instruction::ConditionalEqSkipNext(register as usize, val as u8)
+            }
+            0x4 => {
+                let register = (instruction & 0xf00) >> 8;
+                let val = instruction & 0xff;
+                Instruction::ConditionalInEqSkipNext(register as usize, val as u8)
+            }
+            0x5 => {
+                let registerx = (instruction & 0xf00) >> 8;
+                let registery = (instruction & 0xf0) >> 4;
+
+                Instruction::ConditionalEqRegisterSkipNext(registerx as usize, registery as usize)
             }
             0x6 => {
-                SetRegister(((instruction & 0x0f00) >> 8) as usize, (instruction & 0xff) as u8)
+                Instruction::SetRegister(((instruction & 0x0f00) >> 8) as usize, (instruction & 0xff) as u8)
             }
             0x7 => {
-                AddValueToRegister(((instruction & 0x0f00) >> 8) as usize, (instruction & 0xff) as u8)
+                Instruction::AddValueToRegister(((instruction & 0x0f00) >> 8) as usize, (instruction & 0xff) as u8)
+            }
+            0x9 =>{
+                let registerx = (instruction & 0xf00) >> 8;
+                let registery = (instruction & 0xf0) >> 4;
+
+                Instruction::ConditionalInEqRegisterSkipNext(registerx as usize, registery as usize)
             }
             0xA => {
-                SetIndex(instruction & 0xfff)
+                Instruction::SetIndex(instruction & 0xfff)
             }
             0xD => {
                 let x = (instruction & 0xf00) >> 8;
                 let y = (instruction & 0xf0) >> 4;
                 let n = instruction & 0xf;
-                Draw(x as usize, y as usize, n as u8)
+                Instruction::Draw(x as usize, y as usize, n as u8)
             }
             0x8 => {
                 todo!("Arithmetic instructions pending")
@@ -63,7 +102,7 @@ impl Instruction {
 #[cfg(test)]
 mod tests {
     use crate::device::instruction::Instruction;
-    use crate::device::instruction::Instruction::{AddValueToRegister, ClearScreen, Draw, JumpTo, SetIndex, SetRegister};
+    use crate::device::instruction::Instruction::*;
 
     #[test]
     fn test_clear_screen() {
@@ -73,10 +112,19 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    fn test_other_0x0nnn_instructions_panic() {
-        let instruction_bytes = 0x00f0_u16.to_be_bytes();
-        Instruction::decode_instruction(&instruction_bytes);
+    fn test_procedure_return() {
+        let instruction_bytes = 0x00ee_u16.to_be_bytes();
+        let ins = Instruction::decode_instruction(&instruction_bytes);
+        assert_eq!(ins, ReturnFromProcedure);
+    }
+
+    #[test]
+    fn test_other_0x0nnn_instructions_passthrough() {
+        for instruction_hex in [0xf0u16, 0x0, 0x1, 0x10] {
+            let instruction_bytes = instruction_hex.to_be_bytes();
+            let instruction = Instruction::decode_instruction(&instruction_bytes);
+            assert_eq!(instruction, PassThrough)
+        }
     }
 
 
@@ -92,6 +140,34 @@ mod tests {
         let instruction_bytes = 0x1faf_u16.to_be_bytes();
         let ins = Instruction::decode_instruction(&instruction_bytes);
         assert_eq!(ins, JumpTo(0xfaf));
+    }
+
+    #[test]
+    fn test_link_jump() {
+        let instruction_bytes = 0x2afa_u16.to_be_bytes();
+        let ins = Instruction::decode_instruction(&instruction_bytes);
+        assert_eq!(ins, JumpAndLink(0xafa));
+    }
+
+    #[test]
+    fn test_conditional_equal_skip() {
+        let instruction_bytes = 0x3fad_u16.to_be_bytes();
+        let ins = Instruction::decode_instruction(&instruction_bytes);
+        assert_eq!(ins, ConditionalEqSkipNext(0xf, 0xad));
+    }
+
+    #[test]
+    fn test_conditional_in_equal_skip() {
+        let instruction_bytes = 0x4fea_u16.to_be_bytes();
+        let ins = Instruction::decode_instruction(&instruction_bytes);
+        assert_eq!(ins, ConditionalInEqSkipNext(0xf, 0xea));
+    }
+
+    #[test]
+    fn test_conditional_register_equal_skip() {
+        let instruction_bytes = 0x5fa0_u16.to_be_bytes();
+        let ins = Instruction::decode_instruction(&instruction_bytes);
+        assert_eq!(ins, ConditionalEqRegisterSkipNext(0xf, 0xa));
     }
 
     #[test]
@@ -113,6 +189,12 @@ mod tests {
         let instruction_bytes = 0x7f23_u16.to_be_bytes();
         let ins = Instruction::decode_instruction(&instruction_bytes);
         assert_eq!(ins, AddValueToRegister(15, 0x23));
+    }
+    #[test]
+    fn test_conditional_register_in_equal_skip() {
+        let instruction_bytes = 0x9af0_u16.to_be_bytes();
+        let ins = Instruction::decode_instruction(&instruction_bytes);
+        assert_eq!(ins, ConditionalInEqRegisterSkipNext(0xa, 0xf));
     }
 
     #[test]
