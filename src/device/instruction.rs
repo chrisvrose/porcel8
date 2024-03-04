@@ -26,6 +26,10 @@ pub enum Instruction {
     ConditionalInEqRegisterSkipNext(usize, usize),
     /// ANNN - Set index value
     SetIndex(u16),
+    /// B(X+N)NN - Jump to address with offset. Either v0 or specified register 
+    JumpWithOffset(usize,u16),
+    /// CXNN - AND a random number with NN and place in register
+    RandomOr(usize,u16),
     /// DXYN - Draw pixels at xy pointed by register for n bytes long
     Draw(usize, usize, u8),
 
@@ -107,6 +111,16 @@ impl Instruction {
             0xA => {
                 Instruction::SetIndex(instruction & 0xfff)
             }
+            0xB =>{
+                let register_x = (instruction & 0xf00) >> 8;
+                let jump_address_base = instruction & 0xfff;
+                Instruction::JumpWithOffset(register_x as usize, jump_address_base)
+            }
+            0xC =>{
+                let register_x = (instruction & 0xf00) >> 8;
+                let mask = instruction & 0xff;
+                Instruction::RandomOr(register_x as usize,mask)
+            }
             0xD => {
                 let x = (instruction & 0xf00) >> 8;
                 let y = (instruction & 0xf0) >> 4;
@@ -148,7 +162,7 @@ impl Instruction {
             }
             7=>{
                 Instruction::RSub(reg_x,reg_y)
-            }
+            },
             0xe=>{
                 Instruction::LShift(reg_x,reg_y)
             }
@@ -264,6 +278,22 @@ mod tests {
         let ins = Instruction::decode_instruction(&instruction_bytes);
         assert_eq!(ins, SetIndex(0xfaf));
     }
+    #[test]
+    fn test_jump_with_offset() {
+        let instruction_bytes = 0xbfae_u16.to_be_bytes();
+        let ins = Instruction::decode_instruction(&instruction_bytes);
+        assert_eq!(ins, JumpWithOffset(0xf,0xfae));
+    }
+
+    #[test]
+    fn test_random_and() {
+        let instruction_bytes = 0xcabd_u16.to_be_bytes();
+        let ins = Instruction::decode_instruction(&instruction_bytes);
+        assert_eq!(ins, RandomOr(0xa,0xbd));
+    }
+    
+    
+    
 
     #[test]
     fn test_draw() {
