@@ -14,6 +14,7 @@ use sdl2::render::{BlendMode, TextureAccess, WindowCanvas};
 use simple_logger::SimpleLogger;
 use device::timer::Timer;
 use crate::device::Device;
+use crate::util::EmulatorResult;
 use crate::kb_map::get_key_index;
 use crate::sdl_graphics_adapter::SdlGraphicsAdapter;
 
@@ -21,8 +22,9 @@ mod args;
 mod device;
 mod kb_map;
 mod sdl_graphics_adapter;
+mod util;
 
-fn main() {
+fn main() -> EmulatorResult<()> {
     SimpleLogger::new().with_level(LevelFilter::Info).env().init().unwrap();
     log::info!("Started emulator");
 
@@ -36,9 +38,9 @@ fn main() {
 
     let compute_handle = thread::Builder::new().name("Compute".to_string()).spawn(move || {
         do_device_loop(timer, frame_buffer_for_device, termination_signal_sender_receiver);
-    }).expect("Failed to launch thread");
+    })?;
 
-    let (mut canvas, mut event_pump) = initiate_sdl(8f32);
+    let (mut canvas, mut event_pump) = try_initiate_sdl(8f32)?;
 
     let mut sdl_graphics_adapter = SdlGraphicsAdapter::new();
 
@@ -70,8 +72,8 @@ fn main() {
 
         // The rest of the game loop goes here...
         {
-            let lock = frame_buffer_for_display.lock().expect("Failed to get Display");
-            sdl_graphics_adapter.draw_screen(lock, &mut canvas);
+            let lock = frame_buffer_for_display.lock()?;
+            sdl_graphics_adapter.draw_screen(lock, &mut canvas)?;
         }
         canvas.present();
 
@@ -81,6 +83,7 @@ fn main() {
 
 
     compute_handle.join().unwrap();
+    Ok(())
 }
 
 fn do_device_loop(mut timer: Timer, frame_buffer: Arc<Mutex<Box<[bool; 2048]>>>, receiver: Receiver<()>) {
@@ -118,7 +121,7 @@ fn load_rom() -> [u8; ROM_SIZE] {
     rom_slice
 }
 
-fn initiate_sdl(draw_scale: f32) -> (WindowCanvas, EventPump) {
+fn try_initiate_sdl(draw_scale: f32) -> EmulatorResult<(WindowCanvas, EventPump)> {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
     // let audio_subsystem = sdl_context.audio().unwrap();
@@ -134,19 +137,18 @@ fn initiate_sdl(draw_scale: f32) -> (WindowCanvas, EventPump) {
 
     let window = video_subsystem.window("porcel8", window_width, window_height)
         .position_centered()
-        .build()
-        .unwrap();
-    let mut canvas = window.into_canvas().build().unwrap();
+        .build()?;
+    let mut canvas = window.into_canvas().build()?;
 
-    canvas.set_scale(draw_scale, draw_scale).expect("Setting scale");
+    canvas.set_scale(draw_scale, draw_scale)?;
 
     canvas.set_blend_mode(BlendMode::None);
     canvas.clear();
     canvas.present();
-    let event_pump = sdl_context.event_pump().unwrap();
-    (canvas, event_pump
+    let event_pump = sdl_context.event_pump()?;
+    Ok((canvas, event_pump
      // , audio_queue
-    )
+    ))
 }
 
 
