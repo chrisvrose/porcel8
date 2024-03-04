@@ -13,7 +13,7 @@ pub struct Device {
     pub memory: Box<[u8; Self::DEVICE_MEMORY_SIZE]>,
     pub timer: Timer,
     pub stack: Vec<u16>,
-    pub frame_buffer: Arc<Mutex<Box<[u8;64*32]>>>
+    pub frame_buffer: Arc<Mutex<Box<[bool;64*32]>>>
 }
 
 impl Device {
@@ -21,7 +21,7 @@ impl Device {
     pub const FRAME_BUFFER_WIDTH: usize = 64;
     pub const FRAME_BUFFER_HEIGHT: usize = 32;
     pub const FRAME_BUFFER_SIZE: usize = Self::FRAME_BUFFER_WIDTH*Self::FRAME_BUFFER_HEIGHT;
-    pub fn new(timer: Timer, fb: Arc<Mutex<Box<[u8;64*32]>>>) -> Device {
+    pub fn new(timer: Timer, fb: Arc<Mutex<Box<[bool;Device::FRAME_BUFFER_SIZE]>>>) -> Device {
         let memory = vec![0u8; Self::DEVICE_MEMORY_SIZE].into_boxed_slice().try_into().unwrap();
         log::trace!("Successfully initiated device memory");
         Device {
@@ -66,7 +66,8 @@ impl Device {
 
 
     }
-    pub fn get_framebuffer_index(x:usize,y:usize)->usize{
+    /// convert the 2 indices into one
+    fn get_framebuffer_index(x:usize,y:usize)->usize{
         y*Self::FRAME_BUFFER_WIDTH + x
     }
     pub fn execute_instruction(&mut self, instruction: Instruction) {
@@ -79,7 +80,7 @@ impl Device {
             Instruction::ClearScreen => {
                 let mut frame_buffer = self.frame_buffer.lock().expect("Failed to grab framebuffer for drawing");
                 for pixel in frame_buffer.iter_mut(){
-                    *pixel = 0;
+                    *pixel = false;
                 }
                 log::trace!("ClearScreen")
             }
@@ -97,29 +98,40 @@ impl Device {
                 self.registers.i = value;
             }
             Instruction::Draw(regx,regy, n) => {
-                let mut frame_buffer = self.frame_buffer.lock().expect("Failed to grab framebuffer for drawing");
                 let x = self.registers.v[regx] as usize;
                 let y = self.registers.v[regy] as usize;
-
-                for i in 0..n as usize{
-                    let index = Self::get_framebuffer_index(x,y+i);
-                    let slice_from_memory = self.memory[self.registers.i as usize + i];
-
-                    for bit_index in (0..8).rev() {
-                        // if i'm going to the next line, stop
-                        if Self::get_framebuffer_index(0, y+1)==index {
-                            break;
-                        }
-                        let bit = (slice_from_memory & (1<<bit_index)) >> bit_index;
-
-                        let byte = bit * 0xff;
-                        frame_buffer[index+(7-bit_index)] = frame_buffer[index+(7-bit_index)] ^ (byte);
-                    }
-                }
-                // TODO fix carry bit
-                log::warn!("Draw call incomplete");
+                let toggle_state = self.draw_sprite_at_location(x, y, n);
+                self.set_flag_register(toggle_state);
             }
         };
+    }
+    ///
+    /// Draw a sprite at location at (x,y) for n pixels long and 8 pixels wide.
+    /// Returns whether any pixel was toggled
+    fn draw_sprite_at_location(&mut self, x: usize, y: usize, n: u8)-> bool {
+        let mut frame_buffer = self.frame_buffer.lock().expect("Failed to grab framebuffer for drawing");
+
+        let mut is_pixel_toggled_off = false;
+        for i in 0..n as usize {
+            let index = Self::get_framebuffer_index(x, y + i);
+            let slice_from_memory = self.memory[self.registers.i as usize + i];
+
+            for bit_index in (0..8).rev() {
+                // if i'm going to the next line, stop
+                if Self::get_framebuffer_index(0, y + 1) == index {
+                    break;
+                }
+                let bit_is_true = (slice_from_memory & (1 << bit_index)) == (1<<bit_index) ;
+
+                // if the pixel is going to be toggled false, set this flag bit to true
+                if(frame_buffer[index + (7 - bit_index)] && (bit_is_true)) { is_pixel_toggled_off = true;}
+                frame_buffer[index + (7 - bit_index)] = frame_buffer[index + (7 - bit_index)] ^ (bit_is_true);
+            }
+        }
+        is_pixel_toggled_off
+    }
+    fn set_flag_register(&mut self, x:bool){
+        self.registers.v[0xf] = if x {1} else { 0 }
     }
 
     pub fn set_default_font(&mut self) {

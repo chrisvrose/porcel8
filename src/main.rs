@@ -83,7 +83,7 @@ fn main() {
     compute_handle.join().unwrap();
 }
 
-fn do_device_loop(mut timer: Timer, frame_buffer: Arc<Mutex<Box<[u8; 2048]>>>, receiver: Receiver<()>) {
+fn do_device_loop(mut timer: Timer, frame_buffer: Arc<Mutex<Box<[bool; 2048]>>>, receiver: Receiver<()>) {
     let mut device = Device::new(timer, frame_buffer);
     device.set_default_font();
     {
@@ -105,8 +105,8 @@ fn do_device_loop(mut timer: Timer, frame_buffer: Arc<Mutex<Box<[u8; 2048]>>>, r
 }
 
 
-fn get_frame_buffer() -> Arc<Mutex<Box<[u8; 2048]>>> {
-    Arc::new(Mutex::new(vec![0u8; Device::FRAME_BUFFER_SIZE].into_boxed_slice().try_into().unwrap()))
+fn get_frame_buffer() -> Arc<Mutex<Box<[bool; 2048]>>> {
+    Arc::new(Mutex::new(vec![false; Device::FRAME_BUFFER_SIZE].into_boxed_slice().try_into().unwrap()))
 }
 
 const ROM_SIZE: usize = 4096 - 0x200;

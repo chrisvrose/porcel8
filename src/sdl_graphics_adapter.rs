@@ -17,11 +17,12 @@ impl SdlGraphicsAdapter {
             rgb_frame_buffer
         }
     }
-    pub fn draw_screen(&mut self, frame_buffer: MutexGuard<Box<[u8; Device::FRAME_BUFFER_SIZE]>>, window_canvas: &mut WindowCanvas) {
+    pub fn draw_screen(&mut self, frame_buffer: MutexGuard<Box<[bool; Device::FRAME_BUFFER_SIZE]>>, window_canvas: &mut WindowCanvas) {
         for (i, pixel) in frame_buffer.iter().enumerate() {
-            self.rgb_frame_buffer[3 * i] = *pixel;
-            self.rgb_frame_buffer[3 * i + 1] = *pixel;
-            self.rgb_frame_buffer[3 * i + 2] = *pixel;
+            let col_component = if *pixel { 0xff } else { 0 };
+            self.rgb_frame_buffer[3 * i] = col_component;
+            self.rgb_frame_buffer[3 * i + 1] = col_component;
+            self.rgb_frame_buffer[3 * i + 2] = col_component;
         }
         drop(frame_buffer);
 
