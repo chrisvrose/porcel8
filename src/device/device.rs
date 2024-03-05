@@ -99,7 +99,7 @@ impl Device {
                 self.registers.v[reg_location] = value;
             }
             Instruction::AddValueToRegister(reg_location, value) => {
-                self.registers.v[reg_location] += value;
+                self.registers.v[reg_location] = self.registers.v[reg_location].wrapping_add( value);
             }
             Instruction::SetIndex(value) => {
                 self.registers.i = value;
@@ -252,7 +252,7 @@ impl Device {
                 binary_value_to_decode_temp /= 10;
                 // If this fails, something has gone truly wrong
                 assert_eq!(0, binary_value_to_decode_temp);
-                let val = [unit_digit, tens_digit, hundreds_digit];
+                let val = [hundreds_digit, tens_digit, unit_digit];
                 let index = self.registers.i as usize;
                 self.memory[index..(index + 3)].copy_from_slice(&val);
             }
