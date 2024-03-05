@@ -119,7 +119,7 @@ fn do_device_loop(mut timer: TimerManager, frame_buffer: Arc<Mutex<Box<[bool; 20
         }
         device.cycle().expect("Failed to execute");
         // Put a bit of delay to slow down execution
-        thread::sleep(Duration::from_nanos(500))
+        thread::sleep(Duration::from_millis(2))
     }
 }
 
