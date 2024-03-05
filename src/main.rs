@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Receiver;
 use std::thread;
 use std::time::Duration;
+use clap::Parser;
 use log::LevelFilter;
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::event::Event;
@@ -15,6 +16,7 @@ use sdl2::render::BlendMode;
 use sdl2::render::WindowCanvas;
 use simple_logger::SimpleLogger;
 use device::timer::Timer;
+use crate::args::Porcel8ProgramArgs;
 use crate::device::Device;
 use crate::device::keyboard::Keyboard;
 use crate::util::EmulatorResult;
@@ -31,6 +33,7 @@ mod sdl_keyboard_adapter;
 
 fn main() -> EmulatorResult<()> {
     SimpleLogger::new().with_level(LevelFilter::Info).env().init().unwrap();
+    let Porcel8ProgramArgs { filename } = Porcel8ProgramArgs::parse();
     log::info!("Started emulator");
 
     let mut timer = Timer::new();
@@ -38,12 +41,12 @@ fn main() -> EmulatorResult<()> {
 
     let (frame_buffer_for_display, frame_buffer_for_device) = get_frame_buffer_references();
 
-    let (sdl_kb_adapter,device_keyboard) = SdlKeyboardAdapter::new_keyboard();
+    let (sdl_kb_adapter, device_keyboard) = SdlKeyboardAdapter::new_keyboard();
 
     let (termination_signal_sender, termination_signal_sender_receiver) = std::sync::mpsc::channel();
 
     let compute_handle = thread::Builder::new().name("Compute".to_string()).spawn(move || {
-        do_device_loop(timer, frame_buffer_for_device, termination_signal_sender_receiver, device_keyboard);
+        do_device_loop(timer, frame_buffer_for_device, termination_signal_sender_receiver, device_keyboard, filename);
     })?;
 
     let (mut canvas, mut event_pump) = try_initiate_sdl(8f32)?;
@@ -86,19 +89,21 @@ fn main() -> EmulatorResult<()> {
         canvas.present();
 
         // 60fps - small offset to consider for cpu cycle time
-        thread::sleep(Duration::new(0, 1_000_000_000u32 / 60 ));
+        thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
     }
 
     compute_handle.join().expect("Failed to close compute thread");
     Ok(())
 }
 
-fn do_device_loop(mut timer: Timer, frame_buffer: Arc<Mutex<Box<[bool; 2048]>>>, receiver: Receiver<()>, device_keyboard: Keyboard) {
+fn do_device_loop(mut timer: Timer, frame_buffer: Arc<Mutex<Box<[bool; 2048]>>>, receiver: Receiver<()>, device_keyboard: Keyboard, rom_file_location_option: Option<String>) {
     let mut device = Device::new(timer, frame_buffer, device_keyboard);
     device.set_default_font();
-    {
-        let rom = load_rom();
+
+    if let Some(rom_file_location) = rom_file_location_option {
+        let rom = load_rom(rom_file_location);
         device.load_rom(&rom);
+
     }
 
     loop {
@@ -118,14 +123,14 @@ fn do_device_loop(mut timer: Timer, frame_buffer: Arc<Mutex<Box<[bool; 2048]>>>,
 fn get_frame_buffer_references() -> (Arc<Mutex<Box<[bool; 2048]>>>, Arc<Mutex<Box<[bool; 2048]>>>) {
     let arc = Arc::new(Mutex::new(vec![false; Device::FRAME_BUFFER_SIZE].into_boxed_slice().try_into().unwrap()));
     let arc2 = Arc::clone(&arc);
-    (arc,arc2)
+    (arc, arc2)
 }
 
 const ROM_SIZE: usize = 4096 - 0x200;
 
-fn load_rom() -> [u8; ROM_SIZE] {
+fn load_rom(rom_file_location: String) -> [u8; ROM_SIZE] {
     let mut rom_slice = [0u8; ROM_SIZE];
-    let mut file = File::open("roms/ibm_logo.ch8").expect("could not open");
+    let mut file = File::open(rom_file_location).expect("could not open");
     file.read(&mut rom_slice).expect("Unwrap");
     rom_slice
 }
@@ -156,7 +161,7 @@ fn try_initiate_sdl(draw_scale: f32) -> EmulatorResult<(WindowCanvas, EventPump)
     canvas.present();
     let event_pump = sdl_context.event_pump()?;
     Ok((canvas, event_pump
-     // , audio_queue
+        // , audio_queue
     ))
 }
 
