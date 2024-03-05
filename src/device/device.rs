@@ -7,14 +7,14 @@ use std::time::Duration;
 use rand::random;
 use crate::device::instruction::Instruction;
 use crate::device::keyboard::Keyboard;
-use crate::device::timer::Timer;
+use crate::device::timer::TimerManager;
 use crate::util::EmulatorResult;
 
 
 pub struct Device {
     pub registers: RegisterFile,
     pub memory: Box<[u8; Self::DEVICE_MEMORY_SIZE]>,
-    pub timer: Timer,
+    pub timer: TimerManager,
     pub stack: Vec<u16>,
     pub frame_buffer: Arc<Mutex<Box<[bool; 64 * 32]>>>,
     pub new_chip8_mode: bool,
@@ -26,7 +26,7 @@ impl Device {
     pub const FRAME_BUFFER_WIDTH: usize = 64;
     pub const FRAME_BUFFER_HEIGHT: usize = 32;
     pub const FRAME_BUFFER_SIZE: usize = Self::FRAME_BUFFER_WIDTH * Self::FRAME_BUFFER_HEIGHT;
-    pub fn new(timer: Timer, fb: Arc<Mutex<Box<[bool; Device::FRAME_BUFFER_SIZE]>>>, device_keyboard: Keyboard, new_chip8_mode: bool) -> Device {
+    pub fn new(timer: TimerManager, fb: Arc<Mutex<Box<[bool; Device::FRAME_BUFFER_SIZE]>>>, device_keyboard: Keyboard, new_chip8_mode: bool) -> Device {
         let memory = vec![0u8; Self::DEVICE_MEMORY_SIZE].into_boxed_slice().try_into().unwrap();
         log::trace!("Successfully initiated device memory");
         Device {
@@ -215,8 +215,9 @@ impl Device {
                 let delay_timer_val = self.registers.v[x];
                 self.timer.try_set_timer(delay_timer_val)?;
             }
-            Instruction::SetSoundTimer(_) => {
-                log::warn!("Sound unimplemented, instruction {:?}",instruction);
+            Instruction::SetSoundTimer(x) => {
+                let delay_timer_val = self.registers.v[x];
+                self.timer.try_set_sound(delay_timer_val)?;
             }
             Instruction::AddToIndex(x) => {
                 let reg_value = self.registers.v[x];

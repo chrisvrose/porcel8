@@ -53,16 +53,14 @@ impl Keyboard {
 
     fn update_keyboard_state(&mut self, keyboard_event: KeyboardEvent) {
         match keyboard_event {
-            KeyboardEvent::KeyUp(key) => { self.key_up(key) }
-            KeyboardEvent::KeyDown(key) => { self.key_down(key) }
+            KeyboardEvent::KeyUp(key) => {
+                log::debug!("Key Up - state {}",self.bitflags);
+                self.bitflags &= !((1 << key) as u16);
+            }
+            KeyboardEvent::KeyDown(key) => {
+                log::debug!("Key Down - state {}",self.bitflags);
+                self.bitflags |= 1 << key;
+            }
         }
-    }
-    fn key_down(&mut self, x: u8) {
-        self.bitflags |= 1 << x;
-        log::trace!("Key Down - state {}",self.bitflags);
-    }
-    fn key_up(&mut self, x: u8) {
-        self.bitflags &= !((1 << x) as u16);
-        log::debug!("Key Up - state {}",self.bitflags);
     }
 }
