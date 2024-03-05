@@ -1,6 +1,7 @@
 pub mod timer;
-mod device;
+pub mod keyboard;
 mod sound;
 pub mod instruction;
+mod device;
 
 pub use device::*;

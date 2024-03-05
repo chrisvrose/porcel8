@@ -16,15 +16,18 @@ use sdl2::render::WindowCanvas;
 use simple_logger::SimpleLogger;
 use device::timer::Timer;
 use crate::device::Device;
+use crate::device::keyboard::Keyboard;
 use crate::util::EmulatorResult;
 use crate::kb_map::get_key_index;
 use crate::sdl_graphics_adapter::SdlGraphicsAdapter;
+use crate::sdl_keyboard_adapter::SdlKeyboardAdapter;
 
 mod args;
 mod device;
 mod kb_map;
 mod sdl_graphics_adapter;
 mod util;
+mod sdl_keyboard_adapter;
 
 fn main() -> EmulatorResult<()> {
     SimpleLogger::new().with_level(LevelFilter::Info).env().init().unwrap();
@@ -33,13 +36,14 @@ fn main() -> EmulatorResult<()> {
     let mut timer = Timer::new();
     timer.start();
 
-    let frame_buffer_for_display = get_frame_buffer();
-    let frame_buffer_for_device = Arc::clone(&frame_buffer_for_display);
+    let (frame_buffer_for_display, frame_buffer_for_device) = get_frame_buffer_references();
+    
+    let (sdl_kb_adapter,device_keyboard) = SdlKeyboardAdapter::new_keyboard();
 
     let (termination_signal_sender, termination_signal_sender_receiver) = std::sync::mpsc::channel();
-
+    
     let compute_handle = thread::Builder::new().name("Compute".to_string()).spawn(move || {
-        do_device_loop(timer, frame_buffer_for_device, termination_signal_sender_receiver);
+        do_device_loop(timer, frame_buffer_for_device, termination_signal_sender_receiver, device_keyboard);
     })?;
 
     let (mut canvas, mut event_pump) = try_initiate_sdl(8f32)?;
@@ -59,11 +63,13 @@ fn main() -> EmulatorResult<()> {
                 }
                 Event::KeyDown { keycode: Some(x), repeat: false, .. } => {
                     if let Some(key_val) = get_key_index(x) {
+                        sdl_kb_adapter.send_key_down(key_val)?;
                         log::info!("Key+ {}",key_val)
                     }
                 }
                 Event::KeyUp { keycode: Some(x), repeat: false, .. } => {
                     if let Some(key_val) = get_key_index(x) {
+                        sdl_kb_adapter.send_key_up(key_val)?;
                         log::info!("Key- {}",key_val)
                     }
                 }
@@ -87,8 +93,8 @@ fn main() -> EmulatorResult<()> {
     Ok(())
 }
 
-fn do_device_loop(mut timer: Timer, frame_buffer: Arc<Mutex<Box<[bool; 2048]>>>, receiver: Receiver<()>) {
-    let mut device = Device::new(timer, frame_buffer);
+fn do_device_loop(mut timer: Timer, frame_buffer: Arc<Mutex<Box<[bool; 2048]>>>, receiver: Receiver<()>, device_keyboard: Keyboard) {
+    let mut device = Device::new(timer, frame_buffer, device_keyboard);
     device.set_default_font();
     {
         let rom = load_rom();
@@ -102,15 +108,17 @@ fn do_device_loop(mut timer: Timer, frame_buffer: Arc<Mutex<Box<[bool; 2048]>>>,
         } else if let Err(std::sync::mpsc::TryRecvError::Disconnected) = val {
             panic!("Disconnected");
         }
-        device.cycle();
+        device.cycle().expect("Failed to execute");
         // Put a bit of delay to slow down execution
         thread::sleep(Duration::from_nanos(500))
     }
 }
 
 
-fn get_frame_buffer() -> Arc<Mutex<Box<[bool; 2048]>>> {
-    Arc::new(Mutex::new(vec![false; Device::FRAME_BUFFER_SIZE].into_boxed_slice().try_into().unwrap()))
+fn get_frame_buffer_references() -> (Arc<Mutex<Box<[bool; 2048]>>>, Arc<Mutex<Box<[bool; 2048]>>>) {
+    let arc = Arc::new(Mutex::new(vec![false; Device::FRAME_BUFFER_SIZE].into_boxed_slice().try_into().unwrap()));
+    let arc2 = Arc::clone(&arc);
+    (arc,arc2)
 }
 
 const ROM_SIZE: usize = 4096 - 0x200;

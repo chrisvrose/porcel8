@@ -1,6 +1,8 @@
+use std::sync::mpsc::SendError;
 use std::sync::PoisonError;
 use sdl2::IntegerOrSdlError;
 use sdl2::video::WindowBuildError;
+use crate::device::keyboard::KeyboardEvent;
 
 pub type EmulatorResult<T> = Result<T, EmulatorError>;
 
@@ -41,5 +43,11 @@ impl From<std::io::Error> for EmulatorError{
 impl<T> From<PoisonError<T>> for EmulatorError{
     fn from(value: PoisonError<T>) -> Self {
         Self::MutexInvalidState(value.to_string())
+    }
+}
+
+impl From<SendError<KeyboardEvent>> for EmulatorError{
+    fn from(value: SendError<KeyboardEvent>) -> Self {
+        Self::IOError(format!("Failed to communicate keyboard stats to main thread: {}",value))
     }
 }

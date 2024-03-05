@@ -6,7 +6,9 @@ use std::thread::{JoinHandle, sleep};
 use std::time::Duration;
 use rand::random;
 use crate::device::instruction::Instruction;
+use crate::device::keyboard::Keyboard;
 use crate::device::timer::Timer;
+use crate::util::EmulatorResult;
 
 
 pub struct Device {
@@ -16,6 +18,7 @@ pub struct Device {
     pub stack: Vec<u16>,
     pub frame_buffer: Arc<Mutex<Box<[bool; 64 * 32]>>>,
     pub super_chip8_mode: bool,
+    pub device_keyboard: Keyboard,
 }
 
 impl Device {
@@ -23,7 +26,7 @@ impl Device {
     pub const FRAME_BUFFER_WIDTH: usize = 64;
     pub const FRAME_BUFFER_HEIGHT: usize = 32;
     pub const FRAME_BUFFER_SIZE: usize = Self::FRAME_BUFFER_WIDTH * Self::FRAME_BUFFER_HEIGHT;
-    pub fn new(timer: Timer, fb: Arc<Mutex<Box<[bool; Device::FRAME_BUFFER_SIZE]>>>) -> Device {
+    pub fn new(timer: Timer, fb: Arc<Mutex<Box<[bool; Device::FRAME_BUFFER_SIZE]>>>, device_keyboard: Keyboard) -> Device {
         let memory = vec![0u8; Self::DEVICE_MEMORY_SIZE].into_boxed_slice().try_into().unwrap();
         log::trace!("Successfully initiated device memory");
         Device {
@@ -33,6 +36,7 @@ impl Device {
             stack: Vec::with_capacity(16),
             timer,
             super_chip8_mode: false,
+            device_keyboard
         }
     }
 }
@@ -59,13 +63,16 @@ impl Device {
     const FONT_DEFAULT_MEM_LOCATION_START: usize = 0x50;
     const FONT_DEFAULT_MEM_LOCATION_END: usize = 0x9F;
     const ROM_START: usize = 0x200;
-    pub fn cycle(&mut self) {
+    pub fn cycle(&mut self) ->EmulatorResult<()>{
+        self.device_keyboard.update_keyboard()?;
+        
         let pc = self.registers.pc as usize;
         let instr_slice = self.memory.get(pc..pc + 2).expect("Failed to get memory");
         self.registers.pc += 2;
 
         let instruction = Instruction::decode_instruction(instr_slice);
         self.execute_instruction(instruction);
+        Ok(())
     }
     /// convert the 2 indices into one
     fn get_framebuffer_index(x: usize, y: usize) -> usize {
