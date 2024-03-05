@@ -37,11 +37,11 @@ fn main() -> EmulatorResult<()> {
     timer.start();
 
     let (frame_buffer_for_display, frame_buffer_for_device) = get_frame_buffer_references();
-    
+
     let (sdl_kb_adapter,device_keyboard) = SdlKeyboardAdapter::new_keyboard();
 
     let (termination_signal_sender, termination_signal_sender_receiver) = std::sync::mpsc::channel();
-    
+
     let compute_handle = thread::Builder::new().name("Compute".to_string()).spawn(move || {
         do_device_loop(timer, frame_buffer_for_device, termination_signal_sender_receiver, device_keyboard);
     })?;
