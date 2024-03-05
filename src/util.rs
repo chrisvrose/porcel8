@@ -4,6 +4,7 @@ use sdl2::video::WindowBuildError;
 
 pub type EmulatorResult<T> = Result<T, EmulatorError>;
 
+
 #[derive(Clone, Debug)]
 pub enum EmulatorError {
     SdlError(String),

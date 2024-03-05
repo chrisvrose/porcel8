@@ -1,64 +1,71 @@
 use std::sync::{Arc, Mutex};
+use std::sync::mpsc::SendError;
 use std::thread::{JoinHandle, sleep};
 use std::time::Duration;
+use crate::util::EmulatorResult;
 
-pub struct Timer{
+pub struct Timer {
     timer_left: Arc<Mutex<u16>>,
-    join_handle: Option<(JoinHandle<()>,std::sync::mpsc::Sender<()>)>
+    join_handle: Option<(JoinHandle<()>, std::sync::mpsc::Sender<()>)>,
 }
 
-impl Timer{
-    pub fn new()->Timer{
-        Timer{timer_left:Arc::new(Mutex::default()),join_handle:None}
+impl Timer {
+    pub fn new() -> Timer {
+        Timer { timer_left: Arc::new(Mutex::default()), join_handle: None }
     }
-    pub fn start(&mut self){
+    pub fn start(&mut self) {
         let timer_left_ref = self.timer_left.clone();
-        let (sender,receiver) = std::sync::mpsc::channel();
-        let res = std::thread::spawn(move ||{
-            loop{
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let res = std::thread::spawn(move || {
+            loop {
                 let val = receiver.try_recv();
-                if let Ok(()) = val{
+                if let Ok(()) = val {
                     break;
-                }else if let Err(std::sync::mpsc::TryRecvError::Disconnected) = val{
+                } else if let Err(std::sync::mpsc::TryRecvError::Disconnected) = val {
                     panic!("Disconnected");
                 }
                 {
                     let mut timer_lock = timer_left_ref.lock().expect("Failed to lock");
-                    if *timer_lock >0 {
+                    if *timer_lock > 0 {
                         *timer_lock -= 1;
                     }
                 }
-                sleep(Duration::from_secs_f32(1f32/60f32));
+                sleep(Duration::from_secs_f32(1f32 / 60f32));
             }
-
         });
-        self.join_handle = Some((res,sender));
+        self.join_handle = Some((res, sender));
     }
     /// Set a timer down tick from `val`
-    pub fn set_timer(& self,val:u16){
-        let mut timer_val = self.timer_left.lock().expect("Failed to get mutex");
+    pub fn try_set_timer(&self, val: u16) -> EmulatorResult<()> {
+        let mut timer_val = self.timer_left.lock()?;
         *timer_val = val;
+        Ok(())
     }
 
-    pub fn poll_value(&self)->u16{
-        let res = self.timer_left.lock().expect("Failed to lock?");
-        res.clone()
+    pub fn poll_value(&self) -> EmulatorResult<u16> {
+        let res = self.timer_left.lock()?;
+        Ok(res.clone())
     }
 
-    pub fn stop(self){
-        if let Some((u,x)) = self.join_handle{
-            x.send(()).expect("Failed to send signal to close thread");
+    pub fn stop(self) {
+        if let Some((u, x)) = self.join_handle {
             u.join().expect("Failed to close thread");
-        }else{
+        } else {
             log::warn!("Nothing present!");
         }
     }
-    pub fn send_stop_signal(&mut self){
-        if let Some((_,x)) = &self.join_handle{
-            x.send(()).expect("Failed to send signal to close thread");
-        }else{
+    pub fn send_stop_signal(&mut self) {
+        if let Some((_, x)) = &self.join_handle {
+            match x.send(()) {
+                Ok(_) => {
+                    log::trace!("Sent stop Signal")
+                }
+                Err(SendError(_)) => {
+                    log::info!("Thread already stopped!");
+                }
+            };
+        } else {
             log::warn!("Nothing present!");
         }
     }
-
 }

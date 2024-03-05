@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::Read;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Receiver;
 use std::thread;
 use std::time::Duration;
@@ -9,8 +9,10 @@ use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::event::Event;
 use sdl2::EventPump;
 use sdl2::keyboard::Keycode;
-use sdl2::pixels::{Color, PixelFormatEnum};
-use sdl2::render::{BlendMode, TextureAccess, WindowCanvas};
+use sdl2::pixels::Color;
+use sdl2::render::BlendMode;
+
+use sdl2::render::WindowCanvas;
 use simple_logger::SimpleLogger;
 use device::timer::Timer;
 use crate::device::Device;
@@ -81,8 +83,7 @@ fn main() -> EmulatorResult<()> {
         thread::sleep(Duration::new(0, 1_000_000_000u32 / 60 ));
     }
 
-
-    compute_handle.join().unwrap();
+    compute_handle.join().expect("Failed to close compute thread");
     Ok(())
 }
 
