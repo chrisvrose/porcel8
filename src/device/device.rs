@@ -61,6 +61,7 @@ impl Device {
         0xF0, 0x80, 0xF0, 0x80, 0x80  // F
     ];
     const FONT_DEFAULT_MEM_LOCATION_START: usize = 0x50;
+    const FONT_HEIGHT: u16 = 5;
     const FONT_DEFAULT_MEM_LOCATION_END: usize = 0x9F;
     const ROM_START: usize = 0x200;
     pub fn cycle(&mut self) -> EmulatorResult<()> {
@@ -99,7 +100,7 @@ impl Device {
                 self.registers.v[reg_location] = value;
             }
             Instruction::AddValueToRegister(reg_location, value) => {
-                self.registers.v[reg_location] = self.registers.v[reg_location].wrapping_add( value);
+                self.registers.v[reg_location] = self.registers.v[reg_location].wrapping_add(value);
             }
             Instruction::SetIndex(value) => {
                 self.registers.i = value;
@@ -238,8 +239,7 @@ impl Device {
             }
             Instruction::SetIndexToFontCharacter(x) => {
                 let requested_char = self.registers.v[x];
-                // TODO extract 5 to constant
-                let font_address = Self::FONT_DEFAULT_MEM_LOCATION_START as u16 + 5 * requested_char as u16;
+                let font_address = Self::FONT_DEFAULT_MEM_LOCATION_START as u16 + Self::FONT_HEIGHT * requested_char as u16;
                 self.registers.i = font_address;
             }
             Instruction::DoBCDConversion(x) => {
@@ -250,8 +250,10 @@ impl Device {
                 binary_value_to_decode_temp /= 10;
                 let hundreds_digit = binary_value_to_decode_temp % 10;
                 binary_value_to_decode_temp /= 10;
+
                 // If this fails, something has gone truly wrong
                 assert_eq!(0, binary_value_to_decode_temp);
+
                 let val = [hundreds_digit, tens_digit, unit_digit];
                 let index = self.registers.i as usize;
                 self.memory[index..(index + 3)].copy_from_slice(&val);
@@ -259,15 +261,15 @@ impl Device {
             Instruction::StoreRegistersToMemory(last_reg_to_store) => {
                 let reg_slice = &self.registers.v[0..=last_reg_to_store];
                 let index = self.registers.i as usize;
-                self.memory[index..=(index+last_reg_to_store)].copy_from_slice(reg_slice);
+                self.memory[index..=(index + last_reg_to_store)].copy_from_slice(reg_slice);
                 // Old Chip8 used to use i as a incrementing index
                 if !self.new_chip8_mode {
-                    self.registers.i += last_reg_to_store as u16+ 1;
+                    self.registers.i += last_reg_to_store as u16 + 1;
                 }
             }
             Instruction::LoadRegistersFromMemory(last_reg_to_load) => {
                 let index = self.registers.i as usize;
-                let mem_slice = &self.memory[index..=(index+last_reg_to_load)];
+                let mem_slice = &self.memory[index..=(index + last_reg_to_load)];
                 self.registers.v[0..=last_reg_to_load].copy_from_slice(mem_slice);
                 // Old Chip8 used to use i as a incrementing index
                 if !self.new_chip8_mode {
