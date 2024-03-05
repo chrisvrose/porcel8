@@ -17,7 +17,7 @@ pub struct Device {
     pub timer: Timer,
     pub stack: Vec<u16>,
     pub frame_buffer: Arc<Mutex<Box<[bool; 64 * 32]>>>,
-    pub super_chip8_mode: bool,
+    pub new_chip8_mode: bool,
     pub device_keyboard: Keyboard,
 }
 
@@ -26,7 +26,7 @@ impl Device {
     pub const FRAME_BUFFER_WIDTH: usize = 64;
     pub const FRAME_BUFFER_HEIGHT: usize = 32;
     pub const FRAME_BUFFER_SIZE: usize = Self::FRAME_BUFFER_WIDTH * Self::FRAME_BUFFER_HEIGHT;
-    pub fn new(timer: Timer, fb: Arc<Mutex<Box<[bool; Device::FRAME_BUFFER_SIZE]>>>, device_keyboard: Keyboard) -> Device {
+    pub fn new(timer: Timer, fb: Arc<Mutex<Box<[bool; Device::FRAME_BUFFER_SIZE]>>>, device_keyboard: Keyboard, new_chip8_mode: bool) -> Device {
         let memory = vec![0u8; Self::DEVICE_MEMORY_SIZE].into_boxed_slice().try_into().unwrap();
         log::trace!("Successfully initiated device memory");
         Device {
@@ -35,7 +35,7 @@ impl Device {
             frame_buffer: fb,
             stack: Vec::with_capacity(16),
             timer,
-            super_chip8_mode: false,
+            new_chip8_mode,
             device_keyboard,
         }
     }
@@ -140,7 +140,7 @@ impl Device {
                 }
             }
             Instruction::JumpWithOffset(x, num) => {
-                let regnum = if self.super_chip8_mode { x } else { 0 };
+                let regnum = if self.new_chip8_mode { x } else { 0 };
                 let new_pc = self.registers.v[regnum] as u16 + num;
                 self.registers.pc = new_pc;
             }
@@ -190,7 +190,7 @@ impl Device {
                 self.set_flag_register(is_overflow);
             }
             Instruction::RShift(x, y) => {
-                if (self.super_chip8_mode) {
+                if (self.new_chip8_mode) {
                     self.registers.v[x] = self.registers.v[y];
                 }
                 let (shift_res, did_overflow) = self.registers.v[x].overflowing_shr(1);
@@ -198,7 +198,7 @@ impl Device {
                 self.set_flag_register(did_overflow);
             }
             Instruction::LShift(x, y) => {
-                if (self.super_chip8_mode) {
+                if (self.new_chip8_mode) {
                     self.registers.v[x] = self.registers.v[y];
                 }
                 let (shift_res, did_overflow) = self.registers.v[x].overflowing_shl(1);
@@ -221,7 +221,7 @@ impl Device {
                 let reg_value = self.registers.v[x];
                 let index_original = self.registers.i;
                 // newer instruction set requires wrapping on 12 bit overflow, and setting vf
-                let addn_res = if (self.super_chip8_mode) {
+                let addn_res = if (self.new_chip8_mode) {
                     let overflowing = (reg_value as u16 + index_original) >= 0x1000;
                     self.set_flag_register(overflowing);
                     (reg_value as u16 + index_original) % 0x1000
@@ -261,7 +261,7 @@ impl Device {
                 let index = self.registers.i as usize;
                 self.memory[index..=(index+last_reg_to_store)].copy_from_slice(reg_slice);
                 // Old Chip8 used to use i as a incrementing index
-                if !self.super_chip8_mode {
+                if !self.new_chip8_mode {
                     self.registers.i += last_reg_to_store as u16+ 1;
                 }
             }
@@ -270,7 +270,7 @@ impl Device {
                 let mem_slice = &self.memory[index..=(index+last_reg_to_load)];
                 self.registers.v[0..=last_reg_to_load].copy_from_slice(mem_slice);
                 // Old Chip8 used to use i as a incrementing index
-                if !self.super_chip8_mode {
+                if !self.new_chip8_mode {
                     self.registers.i += last_reg_to_load as u16 + 1;
                 }
             }

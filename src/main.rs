@@ -33,7 +33,7 @@ mod sdl_keyboard_adapter;
 
 fn main() -> EmulatorResult<()> {
     SimpleLogger::new().with_level(LevelFilter::Info).env().init().unwrap();
-    let Porcel8ProgramArgs { filename } = Porcel8ProgramArgs::parse();
+    let Porcel8ProgramArgs { filename, new_chip8_behaviour: new_chip_behaviour,draw_scale } = Porcel8ProgramArgs::parse();
     log::info!("Started emulator");
 
     let mut timer = Timer::new();
@@ -46,10 +46,10 @@ fn main() -> EmulatorResult<()> {
     let (termination_signal_sender, termination_signal_sender_receiver) = std::sync::mpsc::channel();
 
     let compute_handle = thread::Builder::new().name("Compute".to_string()).spawn(move || {
-        do_device_loop(timer, frame_buffer_for_device, termination_signal_sender_receiver, device_keyboard, filename);
+        do_device_loop(timer, frame_buffer_for_device, termination_signal_sender_receiver, device_keyboard, filename, new_chip_behaviour);
     })?;
 
-    let (mut canvas, mut event_pump) = try_initiate_sdl(8f32)?;
+    let (mut canvas, mut event_pump) = try_initiate_sdl(draw_scale)?;
 
     let mut sdl_graphics_adapter = SdlGraphicsAdapter::new();
 
@@ -96,8 +96,8 @@ fn main() -> EmulatorResult<()> {
     Ok(())
 }
 
-fn do_device_loop(mut timer: Timer, frame_buffer: Arc<Mutex<Box<[bool; 2048]>>>, receiver: Receiver<()>, device_keyboard: Keyboard, rom_file_location_option: Option<String>) {
-    let mut device = Device::new(timer, frame_buffer, device_keyboard);
+fn do_device_loop(mut timer: Timer, frame_buffer: Arc<Mutex<Box<[bool; 2048]>>>, receiver: Receiver<()>, device_keyboard: Keyboard, rom_file_location_option: Option<String>, new_chip_behaviour: bool) {
+    let mut device = Device::new(timer, frame_buffer, device_keyboard, new_chip_behaviour);
     device.set_default_font();
 
     if let Some(rom_file_location) = rom_file_location_option {
