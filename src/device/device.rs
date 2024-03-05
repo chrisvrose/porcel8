@@ -71,14 +71,13 @@ impl Device {
         self.registers.pc += 2;
 
         let instruction = Instruction::decode_instruction(instr_slice);
-        self.execute_instruction(instruction);
-        Ok(())
+        self.execute_instruction(instruction)
     }
     /// convert the 2 indices into one
     fn get_framebuffer_index(x: usize, y: usize) -> usize {
         y * Self::FRAME_BUFFER_WIDTH + x
     }
-    pub fn execute_instruction(&mut self, instruction: Instruction) {
+    pub fn execute_instruction(&mut self, instruction: Instruction) -> EmulatorResult<()> {
         // thread::sleep(Duration::from_millis(250));
         log::trace!("Executing {:?}, {:?}",&instruction,&self.registers);
         match instruction {
@@ -142,7 +141,7 @@ impl Device {
             }
             Instruction::JumpWithOffset(x, num) => {
                 let regnum = if self.super_chip8_mode { x } else { 0 };
-                let new_pc = self.registers.v[regnum] as u16 + num ;
+                let new_pc = self.registers.v[regnum] as u16 + num;
                 self.registers.pc = new_pc;
             }
             Instruction::RandomAnd(dest, n) => {
@@ -191,25 +190,92 @@ impl Device {
                 self.set_flag_register(is_overflow);
             }
             Instruction::RShift(x, y) => {
-                if(self.super_chip8_mode){
+                if (self.super_chip8_mode) {
                     self.registers.v[x] = self.registers.v[y];
                 }
-                let (shift_res,did_overflow) = self.registers.v[x].overflowing_shr(1);
+                let (shift_res, did_overflow) = self.registers.v[x].overflowing_shr(1);
                 self.registers.v[x] = shift_res;
                 self.set_flag_register(did_overflow);
             }
             Instruction::LShift(x, y) => {
-                if(self.super_chip8_mode){
+                if (self.super_chip8_mode) {
                     self.registers.v[x] = self.registers.v[y];
                 }
-                let (shift_res,did_overflow) = self.registers.v[x].overflowing_shl(1);
+                let (shift_res, did_overflow) = self.registers.v[x].overflowing_shl(1);
                 self.registers.v[x] = shift_res;
                 self.set_flag_register(did_overflow);
-            },
-            _=>{
-                todo!()
+            }
+
+            Instruction::FetchDelayTimer(x) => {
+                let timer_left = self.timer.poll_value()?;
+                self.registers.v[x] = timer_left
+            }
+            Instruction::SetDelayTimer(x) => {
+                let delay_timer_val = self.registers.v[x];
+                self.timer.try_set_timer(delay_timer_val)?;
+            }
+            Instruction::SetSoundTimer(_) => {
+                log::warn!("Sound unimplemented, instruction {:?}",instruction);
+            }
+            Instruction::AddToIndex(x) => {
+                let reg_value = self.registers.v[x];
+                let index_original = self.registers.i;
+                // newer instruction set requires wrapping on 12 bit overflow, and setting vf
+                let addn_res = if (self.super_chip8_mode) {
+                    let overflowing = (reg_value as u16 + index_original) >= 0x1000;
+                    self.set_flag_register(overflowing);
+                    (reg_value as u16 + index_original) % 0x1000
+                } else {
+                    reg_value as u16 + index_original
+                };
+                self.registers.i = addn_res;
+            }
+            Instruction::GetKey(x) => {
+                let key_expected = self.registers.v[x];
+                if !self.device_keyboard.query_key_down(key_expected) {
+                    self.registers.pc -= 2;
+                }
+            }
+            Instruction::SetIndexToFontCharacter(x) => {
+                let requested_char = self.registers.v[x];
+                // TODO extract 5 to constant
+                let font_address = Self::FONT_DEFAULT_MEM_LOCATION_START as u16 + 5 * requested_char as u16;
+                self.registers.i = font_address;
+            }
+            Instruction::DoBCDConversion(x) => {
+                let mut binary_value_to_decode_temp = self.registers.v[x];
+                let unit_digit = binary_value_to_decode_temp % 10;
+                binary_value_to_decode_temp /= 10;
+                let tens_digit = binary_value_to_decode_temp % 10;
+                binary_value_to_decode_temp /= 10;
+                let hundreds_digit = binary_value_to_decode_temp % 10;
+                binary_value_to_decode_temp /= 10;
+                // If this fails, something has gone truly wrong
+                assert_eq!(0, binary_value_to_decode_temp);
+                let val = [unit_digit, tens_digit, hundreds_digit];
+                let index = self.registers.i as usize;
+                self.memory[index..(index + 3)].copy_from_slice(&val);
+            }
+            Instruction::StoreRegistersToMemory(last_reg_to_store) => {
+                let reg_slice = &self.registers.v[0..=last_reg_to_store];
+                let index = self.registers.i as usize;
+                self.memory[index..=(index+last_reg_to_store)].copy_from_slice(reg_slice);
+                // Old Chip8 used to use i as a incrementing index
+                if !self.super_chip8_mode {
+                    self.registers.i += last_reg_to_store as u16+ 1;
+                }
+            }
+            Instruction::LoadRegistersFromMemory(last_reg_to_load) => {
+                let index = self.registers.i as usize;
+                let mem_slice = &self.memory[index..=(index+last_reg_to_load)];
+                self.registers.v[0..=last_reg_to_load].copy_from_slice(mem_slice);
+                // Old Chip8 used to use i as a incrementing index
+                if !self.super_chip8_mode {
+                    self.registers.i += last_reg_to_load as u16 + 1;
+                }
             }
         };
+        Ok(())
     }
     ///
     /// Draw a sprite at location at (x,y) for n pixels long and 8 pixels wide.

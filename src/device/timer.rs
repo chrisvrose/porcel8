@@ -5,12 +5,12 @@ use std::time::Duration;
 use crate::util::EmulatorResult;
 
 pub struct Timer {
-    timer_left: Arc<Mutex<u16>>,
+    timer_left: Arc<Mutex<u8>>,
     join_handle: Option<(JoinHandle<()>, std::sync::mpsc::Sender<()>)>,
 }
 
 impl Timer {
-    pub const TIMER_THREAD_NAME: &str = "Timer";
+    pub const TIMER_THREAD_NAME: &'static str = "Timer";
     pub fn new() -> Timer {
         Timer { timer_left: Arc::new(Mutex::default()), join_handle: None }
     }
@@ -37,19 +37,19 @@ impl Timer {
         self.join_handle = Some((res, sender));
     }
     /// Set a timer down tick from `val`
-    pub fn try_set_timer(&self, val: u16) -> EmulatorResult<()> {
+    pub fn try_set_timer(&self, val: u8) -> EmulatorResult<()> {
         let mut timer_val = self.timer_left.lock()?;
         *timer_val = val;
         Ok(())
     }
 
-    pub fn poll_value(&self) -> EmulatorResult<u16> {
+    pub fn poll_value(&self) -> EmulatorResult<u8> {
         let res = self.timer_left.lock()?;
         Ok(res.clone())
     }
 
     pub fn stop(self) {
-        if let Some((u, x)) = self.join_handle {
+        if let Some((u, _)) = self.join_handle {
             u.join().expect("Failed to close thread");
         } else {
             log::warn!("Nothing present!");
