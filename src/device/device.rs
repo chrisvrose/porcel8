@@ -14,16 +14,16 @@ pub struct Device {
     pub memory: Box<[u8; Self::DEVICE_MEMORY_SIZE]>,
     pub timer: Timer,
     pub stack: Vec<u16>,
-    pub frame_buffer: Arc<Mutex<Box<[bool;64*32]>>>,
-    pub super_chip8_mode: bool
+    pub frame_buffer: Arc<Mutex<Box<[bool; 64 * 32]>>>,
+    pub super_chip8_mode: bool,
 }
 
 impl Device {
     pub const DEVICE_MEMORY_SIZE: usize = 1 << 12;
     pub const FRAME_BUFFER_WIDTH: usize = 64;
     pub const FRAME_BUFFER_HEIGHT: usize = 32;
-    pub const FRAME_BUFFER_SIZE: usize = Self::FRAME_BUFFER_WIDTH*Self::FRAME_BUFFER_HEIGHT;
-    pub fn new(timer: Timer, fb: Arc<Mutex<Box<[bool;Device::FRAME_BUFFER_SIZE]>>>) -> Device {
+    pub const FRAME_BUFFER_SIZE: usize = Self::FRAME_BUFFER_WIDTH * Self::FRAME_BUFFER_HEIGHT;
+    pub fn new(timer: Timer, fb: Arc<Mutex<Box<[bool; Device::FRAME_BUFFER_SIZE]>>>) -> Device {
         let memory = vec![0u8; Self::DEVICE_MEMORY_SIZE].into_boxed_slice().try_into().unwrap();
         log::trace!("Successfully initiated device memory");
         Device {
@@ -32,7 +32,7 @@ impl Device {
             frame_buffer: fb,
             stack: Vec::with_capacity(16),
             timer,
-            super_chip8_mode: false
+            super_chip8_mode: false,
         }
     }
 }
@@ -66,23 +66,21 @@ impl Device {
 
         let instruction = Instruction::decode_instruction(instr_slice);
         self.execute_instruction(instruction);
-
-
     }
     /// convert the 2 indices into one
-    fn get_framebuffer_index(x:usize,y:usize)->usize{
-        y*Self::FRAME_BUFFER_WIDTH + x
+    fn get_framebuffer_index(x: usize, y: usize) -> usize {
+        y * Self::FRAME_BUFFER_WIDTH + x
     }
     pub fn execute_instruction(&mut self, instruction: Instruction) {
         // thread::sleep(Duration::from_millis(250));
         log::trace!("Executing {:?}, {:?}",&instruction,&self.registers);
-        match instruction{
+        match instruction {
             Instruction::PassThrough => {
                 log::info!("Executing passthrough");
             }
             Instruction::ClearScreen => {
                 let mut frame_buffer = self.frame_buffer.lock().expect("Failed to grab framebuffer for drawing");
-                for pixel in frame_buffer.iter_mut(){
+                for pixel in frame_buffer.iter_mut() {
                     *pixel = false;
                 }
                 log::trace!("ClearScreen")
@@ -100,25 +98,41 @@ impl Device {
             Instruction::SetIndex(value) => {
                 self.registers.i = value;
             }
-            Instruction::Draw(regx,regy, n) => {
+            Instruction::Draw(regx, regy, n) => {
                 let x = self.registers.v[regx] as usize;
                 let y = self.registers.v[regy] as usize;
                 let toggle_state = self.draw_sprite_at_location(x, y, n);
                 self.set_flag_register(toggle_state);
-            },
+            }
             Instruction::JumpAndLink(jump_location) => {
                 self.stack.push(self.registers.pc);
                 self.registers.pc = jump_location;
             }
-            Instruction::ReturnFromProcedure =>{
+            Instruction::ReturnFromProcedure => {
                 let old_pc = self.stack.pop().expect("Expected value on stack pop");
                 self.registers.pc = old_pc;
             }
 
-            Instruction::ConditionalEqSkipNext(_, _) => {}
-            Instruction::ConditionalInEqSkipNext(_, _) => {}
-            Instruction::ConditionalEqRegisterSkipNext(_, _) => {}
-            Instruction::ConditionalInEqRegisterSkipNext(_, _) => {}
+            Instruction::ConditionalEqSkipNext(regx, num) => {
+                if self.registers.v[regx] == num {
+                    self.registers.pc += 2;
+                }
+            }
+            Instruction::ConditionalInEqSkipNext(regx, num) => {
+                if self.registers.v[regx] != num {
+                    self.registers.pc += 2;
+                }
+            }
+            Instruction::ConditionalEqRegisterSkipNext(regx, regy) => {
+                if self.registers.v[regx] == self.registers.v[regy] {
+                    self.registers.pc += 2;
+                }
+            }
+            Instruction::ConditionalInEqRegisterSkipNext(regx, regy) => {
+                if self.registers.v[regx] != self.registers.v[regy] {
+                    self.registers.pc += 2;
+                }
+            }
             Instruction::JumpWithOffset(_, _) => {}
             Instruction::RandomAnd(dest, n) => {
                 self.registers.v[dest] = random::<u8>() & n;
@@ -131,19 +145,19 @@ impl Device {
             Instruction::Or(x, y) => {
                 self.registers.v[x] |= self.registers.v[y];
             }
-            Instruction::And(x,y) => {
+            Instruction::And(x, y) => {
                 self.registers.v[x] &= self.registers.v[y];
             }
-            Instruction::Xor(x,y) => {
+            Instruction::Xor(x, y) => {
                 self.registers.v[x] ^= self.registers.v[y];
             }
-            Instruction::Add(x,y) => {
+            Instruction::Add(x, y) => {
                 let left = self.registers.v[x];
                 let (wrapped_addition_result, is_overflow) = left.overflowing_add(self.registers.v[y]);
                 self.registers.v[x] = wrapped_addition_result;
                 self.set_flag_register(is_overflow);
             }
-            Instruction::Sub(x,y) => {
+            Instruction::Sub(x, y) => {
                 let left = self.registers.v[x];
                 let (wrapped_subtraction_result, is_overflow) = left.overflowing_sub(self.registers.v[y]);
                 self.registers.v[x] = wrapped_subtraction_result;
@@ -162,7 +176,7 @@ impl Device {
     ///
     /// Draw a sprite at location at (x,y) for n pixels long and 8 pixels wide.
     /// Returns whether any pixel was toggled
-    fn draw_sprite_at_location(&mut self, x: usize, y: usize, n: u8)-> bool {
+    fn draw_sprite_at_location(&mut self, x: usize, y: usize, n: u8) -> bool {
         let mut frame_buffer = self.frame_buffer.lock().expect("Failed to grab framebuffer for drawing");
 
         let mut is_pixel_toggled_off = false;
@@ -175,17 +189,17 @@ impl Device {
                 if Self::get_framebuffer_index(0, y + 1) == index {
                     break;
                 }
-                let bit_is_true = (slice_from_memory & (1 << bit_index)) == (1<<bit_index) ;
+                let bit_is_true = (slice_from_memory & (1 << bit_index)) == (1 << bit_index);
 
                 // if the pixel is going to be toggled false, set this flag bit to true
-                if frame_buffer[index + (7 - bit_index)] && (bit_is_true) { is_pixel_toggled_off = true;}
+                if frame_buffer[index + (7 - bit_index)] && (bit_is_true) { is_pixel_toggled_off = true; }
                 frame_buffer[index + (7 - bit_index)] = frame_buffer[index + (7 - bit_index)] ^ (bit_is_true);
             }
         }
         is_pixel_toggled_off
     }
-    fn set_flag_register(&mut self, x:bool){
-        self.registers.v[0xf] = if x {1} else { 0 }
+    fn set_flag_register(&mut self, x: bool) {
+        self.registers.v[0xf] = if x { 1 } else { 0 }
     }
 
     pub fn set_default_font(&mut self) {
