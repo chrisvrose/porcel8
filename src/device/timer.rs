@@ -10,13 +10,14 @@ pub struct Timer {
 }
 
 impl Timer {
+    pub const TIMER_THREAD_NAME: String = "Timer".into();
     pub fn new() -> Timer {
         Timer { timer_left: Arc::new(Mutex::default()), join_handle: None }
     }
     pub fn start(&mut self) {
         let timer_left_ref = self.timer_left.clone();
         let (sender, receiver) = std::sync::mpsc::channel();
-        let res = std::thread::spawn(move || {
+        let res = std::thread::Builder::new().name(Self::TIMER_THREAD_NAME).spawn(move || {
             loop {
                 let val = receiver.try_recv();
                 if let Ok(()) = val {
