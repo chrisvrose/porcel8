@@ -290,10 +290,14 @@ impl Device {
         for i in 0..n as usize {
             let index = Self::get_framebuffer_index(x, y + i);
             let slice_from_memory = self.memory[self.registers.i as usize + i];
-
+            // if we are drawing below the screen
+            if (y+i)>=Self::FRAME_BUFFER_HEIGHT {
+                log::trace!("Overdraw detected, skipping");
+                continue;
+            }
             for bit_index in (0..8).rev() {
-                // if i'm going to the next line, stop
-                if Self::get_framebuffer_index(0, y + 1) == index {
+                // if going out of the screen, stop
+                if Self::get_framebuffer_index(0, y+i + 1) <= (index + (7 - bit_index)) {
                     break;
                 }
                 let bit_is_true = (slice_from_memory & (1 << bit_index)) == (1 << bit_index);

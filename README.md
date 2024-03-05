@@ -13,14 +13,15 @@ Chip 8 emulator/interpreter.
 - [X] Registers
 - [X] Stack
 - [X] Display
-- [ ] Instruction Processing
+- [X] Instruction Processing
   - [X] Bare requirements for IBM Logo
-  - [ ] ALU operations
-  - [ ] Procedure related
-  - [ ] Timer
-  - [ ] Super chip8 compatibility.
-- [ ] Audio
-- [ ] Keyboard
+  - [X] ALU operations
+  - [X] Procedure related
+  - [X] Timer
+  - [X] Super chip8 compatibility.
+- [X] Audio
+  - Audio seems to be broken on my device. I will check with other devices.
+- [X] Keyboard
 
 ### More information on CHIP-8
 
