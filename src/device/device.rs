@@ -36,7 +36,7 @@ impl Device {
             stack: Vec::with_capacity(16),
             timer,
             super_chip8_mode: false,
-            device_keyboard
+            device_keyboard,
         }
     }
 }
@@ -63,9 +63,9 @@ impl Device {
     const FONT_DEFAULT_MEM_LOCATION_START: usize = 0x50;
     const FONT_DEFAULT_MEM_LOCATION_END: usize = 0x9F;
     const ROM_START: usize = 0x200;
-    pub fn cycle(&mut self) ->EmulatorResult<()>{
+    pub fn cycle(&mut self) -> EmulatorResult<()> {
         self.device_keyboard.update_keyboard()?;
-        
+
         let pc = self.registers.pc as usize;
         let instr_slice = self.memory.get(pc..pc + 2).expect("Failed to get memory");
         self.registers.pc += 2;
@@ -140,12 +140,26 @@ impl Device {
                     self.registers.pc += 2;
                 }
             }
-            Instruction::JumpWithOffset(_, _) => {}
+            Instruction::JumpWithOffset(x, num) => {
+                let regnum = if self.super_chip8_mode { x } else { 0 };
+                let new_pc = self.registers.v[regnum] as u16 + num ;
+                self.registers.pc = new_pc;
+            }
             Instruction::RandomAnd(dest, n) => {
                 self.registers.v[dest] = random::<u8>() & n;
             }
-            Instruction::SkipIfKeyPressed(_) => {}
-            Instruction::SkipIfKeyNotPressed(_) => {}
+            Instruction::SkipIfKeyPressed(x) => {
+                let key_press_expected_for = self.registers.v[x];
+                if self.device_keyboard.query_key_down(key_press_expected_for) {
+                    self.registers.pc += 2;
+                }
+            }
+            Instruction::SkipIfKeyNotPressed(x) => {
+                let key_press_expected_for = self.registers.v[x];
+                if !self.device_keyboard.query_key_down(key_press_expected_for) {
+                    self.registers.pc += 2;
+                }
+            }
             Instruction::Set(x, y) => {
                 self.registers.v[x] = self.registers.v[y];
             }
@@ -170,14 +184,31 @@ impl Device {
                 self.registers.v[x] = wrapped_subtraction_result;
                 self.set_flag_register(is_overflow);
             }
-            Instruction::RShift(_, _) => {}
             Instruction::RSub(x, y) => {
                 let left = self.registers.v[y];
                 let (wrapped_subtraction_result, is_overflow) = left.overflowing_sub(self.registers.v[x]);
                 self.registers.v[x] = wrapped_subtraction_result;
                 self.set_flag_register(is_overflow);
             }
-            Instruction::LShift(_, _) => {}
+            Instruction::RShift(x, y) => {
+                if(self.super_chip8_mode){
+                    self.registers.v[x] = self.registers.v[y];
+                }
+                let (shift_res,did_overflow) = self.registers.v[x].overflowing_shr(1);
+                self.registers.v[x] = shift_res;
+                self.set_flag_register(did_overflow);
+            }
+            Instruction::LShift(x, y) => {
+                if(self.super_chip8_mode){
+                    self.registers.v[x] = self.registers.v[y];
+                }
+                let (shift_res,did_overflow) = self.registers.v[x].overflowing_shl(1);
+                self.registers.v[x] = shift_res;
+                self.set_flag_register(did_overflow);
+            },
+            _=>{
+                todo!()
+            }
         };
     }
     ///

@@ -37,6 +37,24 @@ pub enum Instruction {
     SkipIfKeyPressed(usize),
     /// EXA1 - Check if key is not pressed
     SkipIfKeyNotPressed(usize),
+    /// FX07 - Get delay timer, put into register
+    FetchDelayTimer(usize),
+    /// FX15 - set delay timer as register
+    SetDelayTimer(usize),
+    /// FX18 - Set sound timer as register
+    SetSoundTimer(usize),
+    /// FX1E - Add register to index
+    AddToIndex(usize),
+    /// FX0A - Wait for key as indicated by register
+    GetKey(usize),
+    /// FX29 - Set index to register-requested font char address in memory
+    SetIndexToFontCharacter(usize),
+    /// FX33 - Convert register val to bcd and store at location pointed by index
+    DoBCDConversion(usize),
+    /// FX55 - Store all registers from v0 to vx to memory location pointed to by index
+    StoreRegistersToMemory(usize),
+    /// FX65 - Load all registers from v0 to vx to memory location pointed to by index
+    LoadRegistersFromMemory(usize),
 
     // ALU operations going ahead
     /// 8XY0 - x=y
@@ -138,7 +156,44 @@ impl Instruction {
             0xE if (instruction  & 0xff) == 0xa1 => {
                 let x = (instruction & 0xf00) >> 8;
                 Instruction::SkipIfKeyNotPressed(x as usize)
-            }   
+            }
+            0xF if (instruction & 0xff) == 0x07 =>{
+                let x = (instruction & 0xf00) >> 8;
+                Instruction::FetchDelayTimer(x as usize)
+            }
+            0xF if (instruction & 0xff) == 0x15 =>{
+                let x = (instruction & 0xf00) >> 8;
+                Instruction::SetDelayTimer(x as usize)
+            }
+            0xF if (instruction & 0xff) == 0x18 =>{
+                let x = (instruction & 0xf00) >> 8;
+                Instruction::SetSoundTimer(x as usize)
+            }
+            0xF if (instruction & 0xff) == 0x1E =>{
+                let x = (instruction & 0xf00) >> 8;
+                Instruction::AddToIndex(x as usize)
+            }
+            0xF if (instruction & 0xff) == 0x0A =>{
+                let x = (instruction & 0xf00) >> 8;
+                Instruction::GetKey(x as usize)
+            }
+            //TODO add tests from here
+            0xF if (instruction & 0xff) == 0x29 =>{
+                let x = (instruction & 0xf00) >> 8;
+                Instruction::SetIndexToFontCharacter(x as usize)
+            }
+            0xF if (instruction & 0xff) == 0x33 =>{
+                let x = (instruction & 0xf00) >> 8;
+                Instruction::DoBCDConversion(x as usize)
+            }
+            0xF if (instruction & 0xff) == 0x55 =>{
+                let x = (instruction & 0xf00) >> 8;
+                Instruction::StoreRegistersToMemory(x as usize)
+            }
+            0xF if (instruction & 0xff) == 0x65 =>{
+                let x = (instruction & 0xf00) >> 8;
+                Instruction::LoadRegistersFromMemory(x as usize)
+            }
             _ => {
                 todo!("Unimplemented instruction")
             }
@@ -387,6 +442,61 @@ mod tests {
         let instruction_bytes = 0xeba1_u16.to_be_bytes();
         let ins = Instruction::decode_instruction(&instruction_bytes);
         assert_eq!(ins, SkipIfKeyNotPressed(0xb))
+    }
+
+    #[test]
+    fn test_fetch_delay_timer(){
+        let instruction_bytes = 0xfa07_u16.to_be_bytes();
+        let ins = Instruction::decode_instruction(&instruction_bytes);
+        assert_eq!(ins, FetchDelayTimer(0xa))
+    }
+    #[test]
+    fn test_set_delay_timer(){
+        let instruction_bytes = 0xfb15_u16.to_be_bytes();
+        let ins = Instruction::decode_instruction(&instruction_bytes);
+        assert_eq!(ins, SetDelayTimer(0xb))
+    }
+    #[test]
+    fn test_set_sound_timer(){
+        let instruction_bytes = 0xfc18_u16.to_be_bytes();
+        let ins = Instruction::decode_instruction(&instruction_bytes);
+        assert_eq!(ins, SetSoundTimer(0xc))
+    }
+    #[test]
+    fn test_add_to_index(){
+        let instruction_bytes = 0xfb1e_u16.to_be_bytes();
+        let ins = Instruction::decode_instruction(&instruction_bytes);
+        assert_eq!(ins, AddToIndex(0xb))
+    }
+    #[test]
+    fn test_get_key(){
+        let instruction_bytes = 0xf50a_u16.to_be_bytes();
+        let ins = Instruction::decode_instruction(&instruction_bytes);
+        assert_eq!(ins, GetKey(0x5))
+    }
+    #[test]
+    fn test_set_index_to_font_char(){
+        let instruction_bytes = 0xfb29_u16.to_be_bytes();
+        let ins = Instruction::decode_instruction(&instruction_bytes);
+        assert_eq!(ins, SetIndexToFontCharacter(0xb))
+    }
+    #[test]
+    fn test_do_bcd_conversion(){
+        let instruction_bytes = 0xfd33_u16.to_be_bytes();
+        let ins = Instruction::decode_instruction(&instruction_bytes);
+        assert_eq!(ins, DoBCDConversion(0xd))
+    }
+    #[test]
+    fn test_store_regs_to_mem(){
+        let instruction_bytes = 0xfb55_u16.to_be_bytes();
+        let ins = Instruction::decode_instruction(&instruction_bytes);
+        assert_eq!(ins, StoreRegistersToMemory(0xb))
+    }
+    #[test]
+    fn test_load_regs_to_mem(){
+        let instruction_bytes = 0xf965_u16.to_be_bytes();
+        let ins = Instruction::decode_instruction(&instruction_bytes);
+        assert_eq!(ins, LoadRegistersFromMemory(0b1001))
     }
     
 }
