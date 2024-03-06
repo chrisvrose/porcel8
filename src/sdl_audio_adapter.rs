@@ -1,45 +1,58 @@
-use std::sync::{Arc, Mutex, RwLock};
-use log::warn;
-use sdl2::audio::AudioCallback;
+use std::sync::{Arc, Mutex};
+use sdl2::audio::AudioQueue;
+use crate::util::EmulatorResult;
 
-pub struct SquareWave {
+pub struct SdlAudioAdapter {
     sound_timer: Arc<Mutex<u8>>,
     phase_inc: f32,
     phase: f32,
     volume: f32,
+    audio_queue: AudioQueue<f32>,
+    buf: Vec<f32>,
 }
 
-impl SquareWave {
+/// An Audio adapter using `AudioQueue`.
+impl SdlAudioAdapter {
+    pub const SAMPLING_FREQ:i32 = 15360;
+    pub const SAMPLES_PER_FRAME: usize = Self::SAMPLING_FREQ as usize / 60 + 2;
     pub fn new(sound_timer: Arc<Mutex<u8>>,
-               phase_inc: f32,
-               volume: f32)->SquareWave {
-        SquareWave {
+               freq: f32,
+               volume: f32,
+               audio_queue: AudioQueue<f32>) -> SdlAudioAdapter {
+        audio_queue.resume();
+        SdlAudioAdapter {
             sound_timer,
+            buf: vec![0f32; Self::SAMPLES_PER_FRAME],
             phase: 0f32,
-            phase_inc,
+            phase_inc: freq/Self::SAMPLING_FREQ as f32,
             volume,
+            audio_queue,
         }
     }
-}
+    pub fn process_push_audio(&mut self) -> EmulatorResult<()> {
+        // fill the audio vector.
+        let sound_timer = {
+            let sound_timer = self.sound_timer.lock().expect("Could not lock to play audio");
+            sound_timer.clone()
+        };
+        if sound_timer>0 {
+            self.fill_audio();
+            self.audio_queue.queue_audio(&self.buf)?;
+        }
+        Ok(())
+    }
 
-impl AudioCallback for SquareWave {
-    type Channel = f32;
+    fn fill_audio(&mut self) {
+        let out = &mut self.buf;
 
-    fn callback(&mut self, out: &mut [f32]) {
-        let sound_timer = self.sound_timer.lock().expect("Could not lock to play audio");
-        let sound_timer = sound_timer.clone();
-        // log::info!("Processing audio buffer length {}",out.len());
         // Generate a square wave
         for x in out.iter_mut() {
-            *x = if sound_timer > 0 {
-                if self.phase <= 0.5 {
-                    self.volume
-                } else {
-                    -self.volume
-                }
+            *x = if self.phase <= 0.5 {
+                self.volume
             } else {
-                0f32
+                -self.volume
             };
+
             self.phase = (self.phase + self.phase_inc) % 1.0;
         }
     }

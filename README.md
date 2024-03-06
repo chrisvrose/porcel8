@@ -20,7 +20,7 @@ Chip 8 emulator/interpreter.
   - [X] Timer
   - [X] Super chip8 compatibility.
 - [X] Audio
-  - Audio seems to be broken on my device. I will check with other devices.
+  - Audio seems to stutter, but working
 - [X] Keyboard
 
 ### More information on CHIP-8

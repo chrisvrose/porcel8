@@ -43,7 +43,7 @@ impl TimerManager {
                         *timer_lock -= 1;
                     }
                     if *sound_lock > 0 {
-                        log::info!("Beep!");
+                        log::trace!("Beep!");
                         *sound_lock -= 1;
                     }
                 }

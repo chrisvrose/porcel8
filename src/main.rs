@@ -21,7 +21,7 @@ use crate::device::Device;
 use crate::device::keyboard::Keyboard;
 use crate::util::EmulatorResult;
 use crate::kb_map::get_key_index;
-use crate::sdl_audio_adapter::SquareWave;
+use crate::sdl_audio_adapter::SdlAudioAdapter;
 use crate::sdl_graphics_adapter::SdlGraphicsAdapter;
 use crate::sdl_keyboard_adapter::SdlKeyboardAdapter;
 
@@ -41,9 +41,11 @@ fn main() -> EmulatorResult<()> {
     let mut timer = TimerManager::new();
 
 
-    let audio_state = timer.start();
-    let (mut canvas, mut event_pump) = try_initiate_sdl(audio_state,draw_scale)?;
+    let (mut canvas, mut event_pump,audio_queue) = try_initiate_sdl(draw_scale)?;
 
+    let audio_state = timer.start();
+
+    let mut sdl_aud_adapter = SdlAudioAdapter::new(audio_state,440.0,0.5,audio_queue);
     
     
     let (frame_buffer_for_display, frame_buffer_for_device) = get_frame_buffer_references();
@@ -91,7 +93,7 @@ fn main() -> EmulatorResult<()> {
             sdl_graphics_adapter.draw_screen(lock, &mut canvas)?;
         }
         canvas.present();
-
+        sdl_aud_adapter.process_push_audio()?;
         // 60fps - small offset to consider for cpu cycle time
         thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
     }
@@ -139,22 +141,18 @@ fn load_rom(rom_file_location: String) -> [u8; ROM_SIZE] {
     rom_slice
 }
 
-fn try_initiate_sdl(audio_state: Arc<Mutex<u8>>, draw_scale: f32) -> EmulatorResult<(WindowCanvas, EventPump)> {
+fn try_initiate_sdl(draw_scale: f32) -> EmulatorResult<(WindowCanvas, EventPump, AudioQueue<f32>)> {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
     let audio_subsystem = sdl_context.audio().unwrap();
     let wanted_spec = AudioSpecDesired {
         channels: Some(1),
         samples: None,
-        freq: Some(44100),
+        freq: Some(SdlAudioAdapter::SAMPLING_FREQ),
     };
 
-    let device = audio_subsystem.open_playback(None, &wanted_spec, |spec| {
-        // initialize the audio callback
-        SquareWave ::new(audio_state,440.0/spec.freq as f32,0.5)
-    }).unwrap();
-    device.resume();
-        
+    let audio_queue = audio_subsystem.open_queue::<f32,_>(None, &wanted_spec)?;
+
     let window_width = (Device::FRAME_BUFFER_WIDTH as f32 * draw_scale) as u32;
     let window_height = (Device::FRAME_BUFFER_HEIGHT as f32 * draw_scale) as u32;
 
@@ -169,8 +167,7 @@ fn try_initiate_sdl(audio_state: Arc<Mutex<u8>>, draw_scale: f32) -> EmulatorRes
     canvas.clear();
     canvas.present();
     let event_pump = sdl_context.event_pump()?;
-    Ok((canvas, event_pump
-    ))
+    Ok((canvas, event_pump,audio_queue))
 }
 
 
