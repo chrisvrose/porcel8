@@ -15,43 +15,38 @@ use sdl2::render::BlendMode;
 
 use sdl2::render::WindowCanvas;
 use simple_logger::SimpleLogger;
-use device::timer::TimerManager;
+use device::timer::DeviceTimerManager;
 use crate::args::Porcel8ProgramArgs;
 use crate::device::Device;
 use crate::device::keyboard::Keyboard;
 use crate::util::EmulatorResult;
 use crate::kb_map::get_key_index;
-use crate::sdl_audio_adapter::SdlAudioAdapter;
-use crate::sdl_graphics_adapter::SdlGraphicsAdapter;
-use crate::sdl_keyboard_adapter::SdlKeyboardAdapter;
+use crate::sdl_adapters::sdl_audio_adapter::SdlAudioAdapter;
+use crate::sdl_adapters::sdl_graphics_adapter::SdlGraphicsAdapter;
+use crate::sdl_adapters::sdl_keyboard_adapter::SdlKeyboardAdapter;
 
 mod args;
 mod device;
 mod kb_map;
-mod sdl_graphics_adapter;
 mod util;
-mod sdl_keyboard_adapter;
-mod sdl_audio_adapter;
+mod sdl_adapters;
 
 fn main() -> EmulatorResult<()> {
     SimpleLogger::new().with_level(LevelFilter::Info).env().init().unwrap();
     let Porcel8ProgramArgs { filename, new_chip8_behaviour,draw_scale } = Porcel8ProgramArgs::parse();
     log::info!("Started emulator");
 
-    let mut timer = TimerManager::new();
-
 
     let (mut canvas, mut event_pump,audio_queue) = try_initiate_sdl(draw_scale)?;
 
-    let audio_state = timer.start();
-
-    let mut sdl_aud_adapter = SdlAudioAdapter::new(audio_state,440.0,0.85,audio_queue);
-    
+    let (mut timer,mut sdl_aud_adapter) = SdlAudioAdapter::new_timers(440.0,0.85,audio_queue);
     
     let (frame_buffer_for_display, frame_buffer_for_device) = get_frame_buffer_references();
     let (sdl_kb_adapter, device_keyboard) = SdlKeyboardAdapter::new_keyboard();
 
     let (device_termination_signal_sender, device_termination_signal_sender_receiver) = std::sync::mpsc::channel();
+    
+    timer.start();
     let compute_handle = thread::Builder::new().name("Compute".to_string()).spawn(move || {
         do_device_loop(timer, frame_buffer_for_device, device_termination_signal_sender_receiver, device_keyboard, filename, new_chip8_behaviour);
     })?;
@@ -100,7 +95,7 @@ fn main() -> EmulatorResult<()> {
     Ok(())
 }
 
-fn do_device_loop(timer: TimerManager, frame_buffer: Arc<Mutex<Box<[bool; 2048]>>>, receiver: Receiver<()>, device_keyboard: Keyboard, rom_file_location_option: Option<String>, new_chip_behaviour: bool) {
+fn do_device_loop(timer: DeviceTimerManager, frame_buffer: Arc<Mutex<Box<[bool; 2048]>>>, receiver: Receiver<()>, device_keyboard: Keyboard, rom_file_location_option: Option<String>, new_chip_behaviour: bool) {
     let mut device = Device::new(timer, frame_buffer, device_keyboard, new_chip_behaviour);
     device.set_default_font();
 

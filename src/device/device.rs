@@ -1,16 +1,15 @@
 use std::sync::{Arc, Mutex};
-use std::thread::{JoinHandle, sleep};
 use rand::random;
 use crate::device::instruction::Instruction;
 use crate::device::keyboard::Keyboard;
-use crate::device::timer::TimerManager;
+use crate::device::timer::DeviceTimerManager;
 use crate::util::EmulatorResult;
 
 
 pub struct Device {
     pub registers: RegisterFile,
     pub memory: Box<[u8; Self::DEVICE_MEMORY_SIZE]>,
-    pub timer: TimerManager,
+    pub timer: DeviceTimerManager,
     pub stack: Vec<u16>,
     pub frame_buffer: Arc<Mutex<Box<[bool; 64 * 32]>>>,
     pub new_chip8_mode: bool,
@@ -22,7 +21,7 @@ impl Device {
     pub const FRAME_BUFFER_WIDTH: usize = 64;
     pub const FRAME_BUFFER_HEIGHT: usize = 32;
     pub const FRAME_BUFFER_SIZE: usize = Self::FRAME_BUFFER_WIDTH * Self::FRAME_BUFFER_HEIGHT;
-    pub fn new(timer: TimerManager, fb: Arc<Mutex<Box<[bool; Device::FRAME_BUFFER_SIZE]>>>, device_keyboard: Keyboard, new_chip8_mode: bool) -> Device {
+    pub fn new(timer: DeviceTimerManager, fb: Arc<Mutex<Box<[bool; Device::FRAME_BUFFER_SIZE]>>>, device_keyboard: Keyboard, new_chip8_mode: bool) -> Device {
         let memory = vec![0u8; Self::DEVICE_MEMORY_SIZE].into_boxed_slice().try_into().unwrap();
         log::trace!("Successfully initiated device memory");
         Device {
@@ -222,7 +221,7 @@ impl Device {
                 let reg_value = self.registers.v[x];
                 let index_original = self.registers.i;
                 // newer instruction set requires wrapping on 12 bit overflow, and setting vf
-                let addn_res = if (self.new_chip8_mode) {
+                let addn_res = if self.new_chip8_mode {
                     let overflowing = (reg_value as u16 + index_original) >= 0x1000;
                     self.set_flag_register(overflowing);
                     (reg_value as u16 + index_original) % 0x1000

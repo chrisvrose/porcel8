@@ -7,22 +7,23 @@ use std::time::Duration;
 use crate::util::EmulatorResult;
 
 /// Manages the timer and the sound timer
-pub struct TimerManager {
+pub struct DeviceTimerManager {
     timer_left: Arc<Mutex<u8>>,
     sound_left: Arc<Mutex<u8>>,
     join_handle: Option<(JoinHandle<()>, std::sync::mpsc::Sender<()>)>,
 }
 
-impl TimerManager {
+impl DeviceTimerManager {
     pub const TIMER_THREAD_NAME: &'static str = "Timer";
-    pub fn new() -> TimerManager {
-        TimerManager {
+    pub fn new(sound_timer: Arc<Mutex<u8>>) -> DeviceTimerManager {
+        DeviceTimerManager {
             timer_left: Arc::new(Mutex::default()),
-            sound_left: Arc::new(Mutex::default()),
+            sound_left: sound_timer,
             join_handle: None,
         }
     }
-    pub fn start(&mut self) -> Arc<Mutex<u8>> {
+
+    pub fn start(&mut self) {
         let timer_left_ref = self.timer_left.clone();
         let sound_timer_ref = self.sound_left.clone();
         let (sender, receiver) = std::sync::mpsc::channel();
@@ -51,7 +52,6 @@ impl TimerManager {
             }
         }).expect("Failed to start timer thread");
         self.join_handle = Some((res, sender));
-        self.sound_left.clone()
     }
 
     /// Set a timer down tick from `val`
@@ -72,8 +72,8 @@ impl TimerManager {
         Ok(res.clone())
     }
 
-    pub fn stop(self) {
-        if let Some((u, _)) = self.join_handle {
+    pub fn _stop(self) {
+        if let Some((u, _dead_sender)) = self.join_handle {
             u.join().expect("Failed to close thread");
         } else {
             log::warn!("Nothing present!");
