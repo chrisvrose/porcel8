@@ -26,4 +26,5 @@ Chip 8 emulator/interpreter.
 ### More information on CHIP-8
 
 - [Guide to making a CHIP-8 emulator - Tobias V. Langhoff](https://tobiasvl.github.io/blog/write-a-chip-8-emulator/#specifications)
+- [CHIP-8 Test Suite](https://github.com/Timendus/chip8-test-suite)
 - [Awesome CHIP-8](https://chip-8.github.io/links/)

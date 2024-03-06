@@ -180,31 +180,34 @@ impl Device {
             }
             Instruction::Sub(x, y) => {
                 let left = self.registers.v[x];
-                let (wrapped_subtraction_result, is_overflow) = left.overflowing_sub(self.registers.v[y]);
+                let right = self.registers.v[y];
+                let (wrapped_subtraction_result, is_overflow) = left.overflowing_sub(right);
                 self.registers.v[x] = wrapped_subtraction_result;
-                self.set_flag_register(is_overflow);
+                self.set_flag_register(!is_overflow);
             }
             Instruction::RSub(x, y) => {
                 let left = self.registers.v[y];
                 let (wrapped_subtraction_result, is_overflow) = left.overflowing_sub(self.registers.v[x]);
                 self.registers.v[x] = wrapped_subtraction_result;
-                self.set_flag_register(is_overflow);
+                self.set_flag_register(!is_overflow);
             }
             Instruction::RShift(x, y) => {
-                if (self.new_chip8_mode) {
+                if !self.new_chip8_mode {
                     self.registers.v[x] = self.registers.v[y];
                 }
-                let (shift_res, did_overflow) = self.registers.v[x].overflowing_shr(1);
+                let val = self.registers.v[x];
+                let (shift_res, bit_carry) = Self::shr_1(val);
                 self.registers.v[x] = shift_res;
-                self.set_flag_register(did_overflow);
+                self.set_flag_register(bit_carry);
             }
             Instruction::LShift(x, y) => {
-                if (self.new_chip8_mode) {
+                if !self.new_chip8_mode {
                     self.registers.v[x] = self.registers.v[y];
                 }
-                let (shift_res, did_overflow) = self.registers.v[x].overflowing_shl(1);
-                self.registers.v[x] = shift_res;
-                self.set_flag_register(did_overflow);
+                let left = self.registers.v[x];
+                let (res, bit_carry) = Self::shl_1(left);
+                self.registers.v[x] = res;
+                self.set_flag_register(bit_carry);
             }
 
             Instruction::FetchDelayTimer(x) => {
@@ -291,13 +294,13 @@ impl Device {
             let index = Self::get_framebuffer_index(x, y + i);
             let slice_from_memory = self.memory[self.registers.i as usize + i];
             // if we are drawing below the screen
-            if (y+i)>=Self::FRAME_BUFFER_HEIGHT {
+            if (y + i) >= Self::FRAME_BUFFER_HEIGHT {
                 log::trace!("Overdraw detected, skipping");
                 continue;
             }
             for bit_index in (0..8).rev() {
                 // if going out of the screen, stop
-                if Self::get_framebuffer_index(0, y+i + 1) <= (index + (7 - bit_index)) {
+                if Self::get_framebuffer_index(0, y + i + 1) <= (index + (7 - bit_index)) {
                     break;
                 }
                 let bit_is_true = (slice_from_memory & (1 << bit_index)) == (1 << bit_index);
@@ -321,6 +324,17 @@ impl Device {
     pub fn load_rom(&mut self, rom: &[u8]) {
         log::info!("Loaded ROM from memory");
         self.memory[Self::ROM_START..].copy_from_slice(rom);
+    }
+    /// Shift right and get carried out bit
+    fn shr_1(left: u8) -> (u8, bool) {
+        let bit_carry = (left & 0x1) == 0x1;
+        return ((left) >> 1, bit_carry);
+    }
+    /// Shift left, and get carried out bit
+    fn shl_1(left: u8) -> (u8, bool) {
+        let bit_carry = (left & 0x80) == 0x80;
+        let left = left & 0x7f;
+        return ((left & 0x7f) << 1, bit_carry);
     }
 }
 
