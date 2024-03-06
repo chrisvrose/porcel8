@@ -14,7 +14,7 @@ pub struct SdlAudioAdapter {
 /// An Audio adapter using `AudioQueue`.
 impl SdlAudioAdapter {
     pub const SAMPLING_FREQ:i32 = 15360;
-    pub const SAMPLES_PER_FRAME: usize = Self::SAMPLING_FREQ as usize / 60 + 2;
+    pub const SAMPLES_PER_FRAME: usize = (Self::SAMPLING_FREQ as usize / 60) * 2;
     pub fn new(sound_timer: Arc<Mutex<u8>>,
                freq: f32,
                volume: f32,
@@ -35,7 +35,7 @@ impl SdlAudioAdapter {
             let sound_timer = self.sound_timer.lock().expect("Could not lock to play audio");
             sound_timer.clone()
         };
-        if sound_timer>0 {
+        if sound_timer>0 && self.audio_queue.size() < Self::SAMPLING_FREQ as u32 {
             self.fill_audio();
             self.audio_queue.queue_audio(&self.buf)?;
         }

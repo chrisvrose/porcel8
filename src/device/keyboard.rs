@@ -32,7 +32,7 @@ impl Keyboard {
             let keyboard_event_recv_res = self.keyboard_event_receiver.try_recv();
             match keyboard_event_recv_res {
                 Ok(event) => {
-                    log::warn!("Processing {:?}",event);
+                    log::debug!("Processing {:?}",event);
                     self.update_keyboard_state(event);
                 }
                 Err(TryRecvError::Empty) => {
@@ -54,11 +54,9 @@ impl Keyboard {
     fn update_keyboard_state(&mut self, keyboard_event: KeyboardEvent) {
         match keyboard_event {
             KeyboardEvent::KeyUp(key) => {
-                log::debug!("Key Up - state {}",self.bitflags);
                 self.bitflags &= !((1 << key) as u16);
             }
             KeyboardEvent::KeyDown(key) => {
-                log::debug!("Key Down - state {}",self.bitflags);
                 self.bitflags |= 1 << key;
             }
         }

@@ -30,7 +30,7 @@ impl SdlGraphicsAdapter {
 
         let tex_creator = window_canvas.texture_creator();
         let mut tex = tex_creator.create_texture(PixelFormatEnum::RGB24, TextureAccess::Streaming, Device::FRAME_BUFFER_WIDTH as u32, Device::FRAME_BUFFER_HEIGHT as u32).expect("Failed to create tex");
-        tex.with_lock(None, |u, i| {
+        tex.with_lock(None, |u, _i| {
             u.copy_from_slice(self.rgb_frame_buffer.as_slice());
         })?;
         window_canvas.copy(&tex, None, None)?;

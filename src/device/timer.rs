@@ -1,9 +1,9 @@
-use std::f32::consts::PI;
-use std::sync::{Arc, Mutex, RwLock};
+
+use std::sync::{Arc, Mutex};
 use std::sync::mpsc::SendError;
 use std::thread::{JoinHandle, sleep};
 use std::time::Duration;
-use sdl2::audio::AudioQueue;
+
 use crate::util::EmulatorResult;
 
 /// Manages the timer and the sound timer

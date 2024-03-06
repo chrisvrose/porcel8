@@ -10,7 +10,6 @@ pub type EmulatorResult<T> = Result<T, EmulatorError>;
 #[derive(Clone, Debug)]
 pub enum EmulatorError {
     SdlError(String),
-    AllocationError,
     IOError(String),
     MutexInvalidState(String)
 }
@@ -48,6 +47,6 @@ impl<T> From<PoisonError<T>> for EmulatorError{
 
 impl From<SendError<KeyboardEvent>> for EmulatorError{
     fn from(value: SendError<KeyboardEvent>) -> Self {
-        Self::IOError(format!("Failed to communicate keyboard stats to main thread: {}",value))
+        Self::IOError(format!("Failed to communicate keyboard event to main thread: {}",value))
     }
 }

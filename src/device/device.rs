@@ -1,9 +1,5 @@
-use std::ops::SubAssign;
-use std::sync::atomic::{AtomicU16, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
-use std::thread;
+use std::sync::{Arc, Mutex};
 use std::thread::{JoinHandle, sleep};
-use std::time::Duration;
 use rand::random;
 use crate::device::instruction::Instruction;
 use crate::device::keyboard::Keyboard;

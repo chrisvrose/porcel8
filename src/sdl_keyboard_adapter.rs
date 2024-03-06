@@ -23,10 +23,12 @@ impl SdlKeyboardAdapter {
     }
 
     pub fn send_key_up(&self, keycode: u8) -> EmulatorResult<u8> {
+        log::trace!("Sending Key up {}",keycode);
         self.keyboard_event_sender.send(KeyUp(keycode))?;
         Ok(keycode)
     }
     pub fn send_key_down(&self, keycode: u8) -> EmulatorResult<u8> {
+        log::trace!("Sending Key down {}",keycode);
         self.keyboard_event_sender.send(KeyDown(keycode))?;
         Ok(keycode)
     }
