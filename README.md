@@ -1,8 +1,15 @@
 # PORCEL-8
 
-Chip 8 emulator/interpreter
+Chip 8 emulator/interpreter.
 
 ![pong.gif](assets/pong.gif)
+
+There are no included ROMs as part of this project. Please refer to the [Relevant Resources](#relevant-resources) section.
+
+```bash
+./porcel8 -f your_rom.ch8
+```
+
 
 ### Status
 
