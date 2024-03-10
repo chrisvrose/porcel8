@@ -2,13 +2,14 @@
 
 Chip 8 emulator/interpreter.
 
+```bash
+./porcel8 -f an_awesome_chip8_rom.ch8
+```
+
 ![pong.gif](assets/pong.gif)
 
-There are no included ROMs as part of this project. Please refer to the [Relevant Resources](#relevant-resources) section.
 
-```bash
-./porcel8 -f your_rom.ch8
-```
+Please refer to the [Relevant Resources](#relevant-resources) section for some publicly available ROMs.
 
 
 ### Status
