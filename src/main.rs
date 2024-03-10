@@ -1,9 +1,8 @@
-use std::fs::File;
-use std::io::Read;
 use std::sync::{Arc, Mutex};
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::Sender;
 use std::thread;
-use std::time::Duration;
+use std::thread::JoinHandle;
+use std::time::{Duration};
 use clap::Parser;
 use log::LevelFilter;
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
@@ -15,10 +14,10 @@ use sdl2::render::BlendMode;
 
 use sdl2::render::WindowCanvas;
 use simple_logger::SimpleLogger;
-use device::timer::DeviceTimerManager;
+
 use crate::args::Porcel8ProgramArgs;
 use crate::device::Device;
-use crate::device::keyboard::Keyboard;
+
 use crate::util::EmulatorResult;
 use crate::kb_map::get_key_index;
 use crate::sdl_adapters::sdl_audio_adapter::SdlAudioAdapter;
@@ -30,26 +29,26 @@ mod device;
 mod kb_map;
 mod util;
 mod sdl_adapters;
+mod rom;
 
 fn main() -> EmulatorResult<()> {
     SimpleLogger::new().with_level(LevelFilter::Info).env().init().unwrap();
-    let Porcel8ProgramArgs { filename, new_chip8_behaviour,draw_scale } = Porcel8ProgramArgs::parse();
+    let Porcel8ProgramArgs { filename, new_chip8_behaviour, draw_scale } = Porcel8ProgramArgs::parse();
+
     log::info!("Started emulator");
 
+    let (mut canvas, mut event_pump, audio_queue) = try_initiate_sdl(draw_scale)?;
 
-    let (mut canvas, mut event_pump,audio_queue) = try_initiate_sdl(draw_scale)?;
+    let (mut timer, mut sdl_aud_adapter) = SdlAudioAdapter::new_timers(SdlAudioAdapter::AUDIO_FREQUENCY, 0.85, audio_queue);
 
-    let (mut timer,mut sdl_aud_adapter) = SdlAudioAdapter::new_timers(440.0,0.85,audio_queue);
-    
     let (frame_buffer_for_display, frame_buffer_for_device) = get_frame_buffer_references();
     let (sdl_kb_adapter, device_keyboard) = SdlKeyboardAdapter::new_keyboard();
 
-    let (device_termination_signal_sender, device_termination_signal_sender_receiver) = std::sync::mpsc::channel();
-    
     timer.start();
-    let compute_handle = thread::Builder::new().name("Compute".to_string()).spawn(move || {
-        do_device_loop(timer, frame_buffer_for_device, device_termination_signal_sender_receiver, device_keyboard, filename, new_chip8_behaviour);
-    })?;
+
+    let device = Device::new(timer, frame_buffer_for_device, device_keyboard, new_chip8_behaviour);
+
+    let (device_termination_signal_sender, compute_handle) = start_compute_thread(filename, device)?;
 
 
     let mut sdl_graphics_adapter = SdlGraphicsAdapter::new();
@@ -57,7 +56,11 @@ fn main() -> EmulatorResult<()> {
     canvas.set_draw_color(Color::BLACK);
     canvas.clear();
 
+    // Compute a frame time offset
+    // Thread will sleep for 60fps - (time spent computing)
+    let mut frame_timer = std::time::Instant::now();
     'running: loop {
+        let last_time = frame_timer.elapsed();
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit { .. } |
@@ -79,43 +82,46 @@ fn main() -> EmulatorResult<()> {
             }
         }
 
-
-        // The rest of the game loop goes here...
+        // lock and draw framebuffer
         {
             let lock = frame_buffer_for_display.lock()?;
             sdl_graphics_adapter.draw_screen(lock, &mut canvas)?;
         }
         canvas.present();
         sdl_aud_adapter.process_push_audio()?;
-        // 60fps - small offset to consider for cpu cycle time
-        thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
+        let sleep_duration = SdlGraphicsAdapter::FRAME_RATE_TIMING - last_time;
+        thread::sleep(sleep_duration);
+        frame_timer = std::time::Instant::now();
     }
 
     compute_handle.join().expect("Failed to close compute thread");
     Ok(())
 }
 
-fn do_device_loop(timer: DeviceTimerManager, frame_buffer: Arc<Mutex<Box<[bool; 2048]>>>, receiver: Receiver<()>, device_keyboard: Keyboard, rom_file_location_option: Option<String>, new_chip_behaviour: bool) {
-    let mut device = Device::new(timer, frame_buffer, device_keyboard, new_chip_behaviour);
+fn start_compute_thread(filename: Option<String>, mut device: Device) -> EmulatorResult<(Sender<()>, JoinHandle<()>)> {
     device.set_default_font();
 
-    if let Some(rom_file_location) = rom_file_location_option {
-        let rom = load_rom(rom_file_location);
+    if let Some(rom_file_location) = filename {
+        let rom = rom::load_rom(rom_file_location)?;
         device.load_rom(&rom);
-
     }
 
-    loop {
-        let val = receiver.try_recv();
-        if let Ok(()) = val {
-            break;
-        } else if let Err(std::sync::mpsc::TryRecvError::Disconnected) = val {
-            panic!("Disconnected");
+    let (device_termination_signal_sender, device_termination_signal_sender_receiver) = std::sync::mpsc::channel();
+    let compute_handle = thread::Builder::new().name("Compute".to_string()).spawn(move || {
+
+        loop {
+            let val = device_termination_signal_sender_receiver.try_recv();
+            if let Ok(()) = val {
+                break;
+            } else if let Err(std::sync::mpsc::TryRecvError::Disconnected) = val {
+                panic!("Disconnected");
+            }
+            device.cycle().expect("Failed to execute");
+            // Put a bit of delay to slow down execution
+            thread::sleep(Duration::from_millis(2))
         }
-        device.cycle().expect("Failed to execute");
-        // Put a bit of delay to slow down execution
-        thread::sleep(Duration::from_millis(2))
-    }
+    })?;
+    Ok((device_termination_signal_sender, compute_handle))
 }
 
 
@@ -125,15 +131,10 @@ fn get_frame_buffer_references() -> (Arc<Mutex<Box<[bool; 2048]>>>, Arc<Mutex<Bo
     (arc, arc2)
 }
 
-const ROM_SIZE: usize = 4096 - 0x200;
-
-fn load_rom(rom_file_location: String) -> [u8; ROM_SIZE] {
-    let mut rom_slice = [0u8; ROM_SIZE];
-    let mut file = File::open(rom_file_location).expect("could not open");
-    file.read(&mut rom_slice).expect("Unwrap");
-    rom_slice
-}
-
+/// Initiate SDL resources:
+/// 1. A window canvas for drawing
+/// 2. An event pump for use as an event loop,
+/// 3. An Audio queue for sound
 fn try_initiate_sdl(draw_scale: f32) -> EmulatorResult<(WindowCanvas, EventPump, AudioQueue<f32>)> {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
@@ -144,7 +145,7 @@ fn try_initiate_sdl(draw_scale: f32) -> EmulatorResult<(WindowCanvas, EventPump,
         freq: Some(SdlAudioAdapter::SAMPLING_FREQ),
     };
 
-    let audio_queue = audio_subsystem.open_queue::<f32,_>(None, &wanted_spec)?;
+    let audio_queue = audio_subsystem.open_queue::<f32, _>(None, &wanted_spec)?;
 
     let window_width = (Device::FRAME_BUFFER_WIDTH as f32 * draw_scale) as u32;
     let window_height = (Device::FRAME_BUFFER_HEIGHT as f32 * draw_scale) as u32;
@@ -160,7 +161,7 @@ fn try_initiate_sdl(draw_scale: f32) -> EmulatorResult<(WindowCanvas, EventPump,
     canvas.clear();
     canvas.present();
     let event_pump = sdl_context.event_pump()?;
-    Ok((canvas, event_pump,audio_queue))
+    Ok((canvas, event_pump, audio_queue))
 }
 
 

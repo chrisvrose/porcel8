@@ -16,6 +16,7 @@ pub struct SdlAudioAdapter {
 impl SdlAudioAdapter {
     /// Number of samples per second
     pub const SAMPLING_FREQ:i32 = 15360;
+    pub const AUDIO_FREQUENCY: f32 = 440.0;
     pub const SAMPLES_PER_FRAME: usize = (Self::SAMPLING_FREQ as usize / 60) * 2;
     pub fn new_timers(freq: f32,
                  volume: f32,

@@ -2,13 +2,11 @@ use std::sync::mpsc::TryRecvError;
 use crate::util::{EmulatorError, EmulatorResult};
 
 
-// display thread sends these to the device thread.
-
-// device thread updates on key up and down?
-
-
+/// An emulated keyboard that receives keyboard data as input
 pub struct Keyboard {
+    /// Current keyboard state
     bitflags: u16,
+    /// Receives keyboard events from main thread
     keyboard_event_receiver: std::sync::mpsc::Receiver<KeyboardEvent>,
 }
 
@@ -26,7 +24,8 @@ impl Keyboard {
         }
     }
 
-    /// Update keyboard based on pending keyboard events
+    /// Update keyboard based on pending keyboard events.
+    /// If no events are presents, it will return without any action.
     pub fn update_keyboard(&mut self) -> EmulatorResult<()> {
         loop {
             let keyboard_event_recv_res = self.keyboard_event_receiver.try_recv();
@@ -44,7 +43,6 @@ impl Keyboard {
             }
         }
     }
-
 
     /// Query if key is down
     pub fn query_key_down(&self, key_num: u8) -> bool {

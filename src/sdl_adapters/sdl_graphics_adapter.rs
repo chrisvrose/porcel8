@@ -1,15 +1,16 @@
 use std::sync::MutexGuard;
+use std::time::Duration;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::render::{TextureAccess, WindowCanvas};
 use crate::device::Device;
 use crate::util::EmulatorResult;
 
-#[derive(Debug)]
 pub struct SdlGraphicsAdapter {
     rgb_frame_buffer: Vec<u8>,
 }
 
 impl SdlGraphicsAdapter {
+    pub const FRAME_RATE_TIMING: Duration = Duration::new(0, 1_000_000_000u32 / 60);
     pub const RGB_COMPONENTS: usize = 3;
     pub const RGB_FRAMEBUFFER_SIZE: usize = Self::RGB_COMPONENTS * Device::FRAME_BUFFER_SIZE;
     pub fn new() -> SdlGraphicsAdapter {
@@ -18,7 +19,7 @@ impl SdlGraphicsAdapter {
             rgb_frame_buffer
         }
     }
-    pub fn draw_screen(&mut self, frame_buffer: MutexGuard<Box<[bool; Device::FRAME_BUFFER_SIZE]>>, window_canvas: &mut WindowCanvas) ->EmulatorResult<()> {
+    pub fn draw_screen(&mut self, frame_buffer: MutexGuard<Box<[bool; Device::FRAME_BUFFER_SIZE]>>, window_canvas: &mut WindowCanvas) -> EmulatorResult<()> {
         for (i, pixel) in frame_buffer.iter().enumerate() {
             let col_component = if *pixel { 0xff } else { 0 };
             self.rgb_frame_buffer[3 * i] = col_component;
