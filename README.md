@@ -39,10 +39,8 @@ Please refer to the [Relevant Resources](#relevant-resources) section for some p
 
 Known inaccuracies:
 - Get key is triggered when key is pressed (not just released)
-- Display stutters
-  - This is due to rendering happening on a separate thread.
-- Audio stutters
-  - This is due to using an audio queue, instead of the traditional audio callback.
+- Slight display and audio stutters
+  - Audio stutters are due to a workaround needed from an issue with SDL2 in my system.
 
 ### Relevant Resources
 
