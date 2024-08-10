@@ -33,7 +33,7 @@ mod rom;
 
 fn main() -> EmulatorResult<()> {
     SimpleLogger::new().with_level(LevelFilter::Info).env().init().unwrap();
-    let Porcel8ProgramArgs { filename, new_chip8_behaviour, draw_scale } = Porcel8ProgramArgs::parse();
+    let Porcel8ProgramArgs { filename, new_chip8_behaviour, draw_scale, halt_on_invalid } = Porcel8ProgramArgs::parse();
 
     log::info!("Started emulator");
 
@@ -46,7 +46,7 @@ fn main() -> EmulatorResult<()> {
 
     timer.start();
 
-    let device = Device::new(timer, frame_buffer_for_device, device_keyboard, new_chip8_behaviour);
+    let device = Device::new(timer, frame_buffer_for_device, device_keyboard, new_chip8_behaviour, halt_on_invalid);
 
     let (device_termination_signal_sender, compute_handle) = start_compute_thread(filename, device)?;
 
@@ -163,6 +163,3 @@ fn try_initiate_sdl(draw_scale: f32) -> EmulatorResult<(WindowCanvas, EventPump,
     let event_pump = sdl_context.event_pump()?;
     Ok((canvas, event_pump, audio_queue))
 }
-
-
-

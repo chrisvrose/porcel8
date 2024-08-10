@@ -1,10 +1,9 @@
-use std::sync::{Arc, Mutex};
-use rand::random;
-use crate::device::instruction::Instruction;
+use crate::{device::instruction::Instruction, util::EmulatorError};
 use crate::device::keyboard::Keyboard;
 use crate::device::timer::DeviceTimerManager;
 use crate::util::EmulatorResult;
-
+use rand::random;
+use std::sync::{Arc, Mutex};
 
 pub struct Device {
     pub registers: RegisterFile,
@@ -13,6 +12,7 @@ pub struct Device {
     pub stack: Vec<u16>,
     pub frame_buffer: Arc<Mutex<Box<[bool; 64 * 32]>>>,
     pub new_chip8_mode: bool,
+    pub halt_on_invalid: bool,
     pub device_keyboard: Keyboard,
 }
 
@@ -21,14 +21,24 @@ impl Device {
     pub const FRAME_BUFFER_WIDTH: usize = 64;
     pub const FRAME_BUFFER_HEIGHT: usize = 32;
     pub const FRAME_BUFFER_SIZE: usize = Self::FRAME_BUFFER_WIDTH * Self::FRAME_BUFFER_HEIGHT;
-    pub fn new(timer: DeviceTimerManager, fb: Arc<Mutex<Box<[bool; Device::FRAME_BUFFER_SIZE]>>>, device_keyboard: Keyboard, new_chip8_mode: bool) -> Device {
-        let memory = vec![0u8; Self::DEVICE_MEMORY_SIZE].into_boxed_slice().try_into().unwrap();
+    pub fn new(
+        timer: DeviceTimerManager,
+        fb: Arc<Mutex<Box<[bool; Device::FRAME_BUFFER_SIZE]>>>,
+        device_keyboard: Keyboard,
+        new_chip8_mode: bool,
+        halt_on_invalid: bool
+    ) -> Device {
+        let memory = vec![0u8; Self::DEVICE_MEMORY_SIZE]
+            .into_boxed_slice()
+            .try_into()
+            .unwrap();
         log::trace!("Successfully initiated device memory");
         Device {
             registers: RegisterFile::new(),
             memory,
             frame_buffer: fb,
             stack: Vec::with_capacity(16),
+            halt_on_invalid,
             timer,
             new_chip8_mode,
             device_keyboard,
@@ -41,9 +51,7 @@ impl Device {
     const FONT_DEFAULT_MEM_LOCATION_START: usize = 0x50;
     const FONT_DEFAULT_MEM_LOCATION_END: usize = 0x9F;
     const ROM_START: usize = 0x200;
-    
-    
-    
+
     pub fn cycle(&mut self) -> EmulatorResult<()> {
         self.device_keyboard.update_keyboard()?;
 
@@ -60,13 +68,19 @@ impl Device {
     }
     pub fn execute_instruction(&mut self, instruction: Instruction) -> EmulatorResult<()> {
         // thread::sleep(Duration::from_millis(250));
-        log::trace!("Executing {:?}, {:?}",&instruction,&self.registers);
+        log::trace!("Executing {:?}, {:?}", &instruction, &self.registers);
         match instruction {
-            Instruction::PassThrough => {
+            Instruction::InvalidInstruction => {
                 log::info!("Executing passthrough");
-            }
+                if self.halt_on_invalid {
+                    return Err(EmulatorError::IOError("Caught Invalid Instruction".to_string()));
+                }
+            },
             Instruction::ClearScreen => {
-                let mut frame_buffer = self.frame_buffer.lock().expect("Failed to grab framebuffer for drawing");
+                let mut frame_buffer = self
+                    .frame_buffer
+                    .lock()
+                    .expect("Failed to grab framebuffer for drawing");
                 for pixel in frame_buffer.iter_mut() {
                     *pixel = false;
                 }
@@ -154,7 +168,8 @@ impl Device {
             }
             Instruction::Add(x, y) => {
                 let left = self.registers.v[x];
-                let (wrapped_addition_result, is_overflow) = left.overflowing_add(self.registers.v[y]);
+                let (wrapped_addition_result, is_overflow) =
+                    left.overflowing_add(self.registers.v[y]);
                 self.registers.v[x] = wrapped_addition_result;
                 self.set_flag_register(is_overflow);
             }
@@ -167,7 +182,8 @@ impl Device {
             }
             Instruction::RSub(x, y) => {
                 let left = self.registers.v[y];
-                let (wrapped_subtraction_result, is_overflow) = left.overflowing_sub(self.registers.v[x]);
+                let (wrapped_subtraction_result, is_overflow) =
+                    left.overflowing_sub(self.registers.v[x]);
                 self.registers.v[x] = wrapped_subtraction_result;
                 self.set_flag_register(!is_overflow);
             }
@@ -223,7 +239,8 @@ impl Device {
             }
             Instruction::SetIndexToFontCharacter(x) => {
                 let requested_char = self.registers.v[x];
-                let font_address = Self::FONT_DEFAULT_MEM_LOCATION_START as u16 + Self::FONT_HEIGHT * requested_char as u16;
+                let font_address = Self::FONT_DEFAULT_MEM_LOCATION_START as u16
+                    + Self::FONT_HEIGHT * requested_char as u16;
                 self.registers.i = font_address;
             }
             Instruction::DoBCDConversion(x) => {
@@ -267,7 +284,10 @@ impl Device {
     /// Draw a sprite at location at (x,y) for n pixels long and 8 pixels wide.
     /// Returns whether any pixel was toggled
     fn draw_sprite_at_location(&mut self, x: usize, y: usize, n: u8) -> bool {
-        let mut frame_buffer = self.frame_buffer.lock().expect("Failed to grab framebuffer for drawing");
+        let mut frame_buffer = self
+            .frame_buffer
+            .lock()
+            .expect("Failed to grab framebuffer for drawing");
 
         let mut is_pixel_toggled_off = false;
         for i in 0..n as usize {
@@ -286,8 +306,11 @@ impl Device {
                 let bit_is_true = (slice_from_memory & (1 << bit_index)) == (1 << bit_index);
 
                 // if the pixel is going to be toggled false, set this flag bit to true
-                if frame_buffer[index + (7 - bit_index)] && (bit_is_true) { is_pixel_toggled_off = true; }
-                frame_buffer[index + (7 - bit_index)] = frame_buffer[index + (7 - bit_index)] ^ (bit_is_true);
+                if frame_buffer[index + (7 - bit_index)] && (bit_is_true) {
+                    is_pixel_toggled_off = true;
+                }
+                frame_buffer[index + (7 - bit_index)] =
+                    frame_buffer[index + (7 - bit_index)] ^ (bit_is_true);
             }
         }
         is_pixel_toggled_off
@@ -313,10 +336,11 @@ impl Device {
             0xF0, 0x80, 0x80, 0x80, 0xF0, // C
             0xE0, 0x90, 0x90, 0x90, 0xE0, // D
             0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
-            0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+            0xF0, 0x80, 0xF0, 0x80, 0x80, // F
         ];
         log::info!("Loaded default font from memory");
-        self.memory[Self::FONT_DEFAULT_MEM_LOCATION_START..=Self::FONT_DEFAULT_MEM_LOCATION_END].copy_from_slice(&DEFAULT_FONT);
+        self.memory[Self::FONT_DEFAULT_MEM_LOCATION_START..=Self::FONT_DEFAULT_MEM_LOCATION_END]
+            .copy_from_slice(&DEFAULT_FONT);
     }
     /// load a rom from bytes
     pub fn load_rom(&mut self, rom: &[u8]) {
