@@ -3,8 +3,8 @@ use clap::Parser;
 #[derive(Parser, Debug, Clone)]
 #[command(version, about, author)]
 pub struct Porcel8ProgramArgs {
-    #[arg(short, long, help = "Filename of ROM to load.")]
-    pub filename: Option<String>,
+    /// CHIP-8 rom file to load
+    pub filename: String,
     #[arg(short, long, help = "Draw scale of window", default_value_t = 8f32)]
     pub draw_scale: f32,
     #[arg(

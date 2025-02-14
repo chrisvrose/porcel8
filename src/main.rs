@@ -94,13 +94,11 @@ fn main() -> EmulatorResult<()> {
     Ok(())
 }
 
-fn start_compute_thread(filename: Option<String>, mut device: Device) -> EmulatorResult<(Sender<()>, JoinHandle<()>)> {
+fn start_compute_thread(filename: String, mut device: Device) -> EmulatorResult<(Sender<()>, JoinHandle<()>)> {
     device.set_default_font();
 
-    if let Some(rom_file_location) = filename {
-        let rom = rom::load_rom(rom_file_location)?;
-        device.load_rom(&rom);
-    }
+    let rom = rom::load_rom(filename)?;
+    device.load_rom(&rom);
 
     let (device_termination_signal_sender, device_termination_signal_sender_receiver) = std::sync::mpsc::channel();
     let compute_handle = thread::Builder::new().name("Compute".to_string()).spawn(move || {

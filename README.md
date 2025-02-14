@@ -3,7 +3,7 @@
 Chip 8 emulator/interpreter.
 
 ```bash
-./porcel8 -f an_awesome_chip8_rom.ch8
+./porcel8 an_awesome_chip8_rom.ch8
 ```
 
 ![pong.gif](assets/pong.gif)
