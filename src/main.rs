@@ -29,6 +29,8 @@ mod util;
 mod sdl_adapters;
 mod rom;
 
+const WINDOW_TITLE: &str = "porcel8";
+
 fn main() -> EmulatorResult<()> {
     SimpleLogger::new().with_level(LevelFilter::Info).env().init().unwrap();
     let Porcel8ProgramArgs { filename, new_chip8_behaviour, draw_scale, halt_on_invalid } = Porcel8ProgramArgs::parse();
@@ -144,7 +146,7 @@ fn try_initiate_sdl(draw_scale: f32) -> EmulatorResult<(WindowCanvas, EventPump,
     let window_width = (Device::FRAME_BUFFER_WIDTH as f32 * draw_scale) as u32;
     let window_height = (Device::FRAME_BUFFER_HEIGHT as f32 * draw_scale) as u32;
 
-    let window = video_subsystem.window("porcel8", window_width, window_height)
+    let window = video_subsystem.window(WINDOW_TITLE, window_width, window_height)
         .position_centered()
         .build()?;
     let mut canvas = window.into_canvas().build()?;

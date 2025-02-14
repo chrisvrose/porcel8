@@ -60,3 +60,19 @@ impl SdlKeyboardAdapter {
     }
 
 }
+
+#[cfg(test)]
+mod tests{
+    use crate::device::keyboard::Key;
+
+    use super::SdlKeyboardAdapter;
+
+    #[test]
+    fn test_keycode_to_key(){
+        assert_eq!(Some(Key::K7), SdlKeyboardAdapter::keycode_to_key(sdl2::keyboard::Keycode::A));
+    }
+    #[test]
+    fn test_keycode_to_key_no_key(){
+        assert_eq!(None, SdlKeyboardAdapter::keycode_to_key(sdl2::keyboard::Keycode::L));
+    }
+}

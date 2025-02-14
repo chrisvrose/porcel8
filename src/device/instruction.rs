@@ -170,7 +170,6 @@ impl Instruction {
                 let x = (instruction & 0xf00) >> 8;
                 Instruction::GetKey(x as usize)
             }
-            //TODO add tests from here
             0xF if (instruction & 0xff) == 0x29 => {
                 let x = (instruction & 0xf00) >> 8;
                 Instruction::SetIndexToFontCharacter(x as usize)
