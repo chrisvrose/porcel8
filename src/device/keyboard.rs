@@ -9,11 +9,15 @@ pub struct Keyboard {
     /// Receives keyboard events from main thread
     keyboard_event_receiver: std::sync::mpsc::Receiver<KeyboardEvent>,
 }
+#[derive(Eq,PartialEq, PartialOrd, Clone, Copy, Debug)]
+pub enum Key{
+    K0=0,K1,K2,K3,K4,K5,K6,K7,K8,K9,KA,KB,KC,KD,KE,KF
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum KeyboardEvent {
-    KeyUp(u8),
-    KeyDown(u8),
+    KeyUp(Key),
+    KeyDown(Key),
 }
 
 impl Keyboard {
@@ -26,7 +30,7 @@ impl Keyboard {
 
     /// Update keyboard based on pending keyboard events.
     /// If no events are presents, it will return without any action.
-    pub fn update_keyboard(&mut self) -> EmulatorResult<()> {
+    pub fn update_keyboard_registers(&mut self) -> EmulatorResult<()> {
         loop {
             let keyboard_event_recv_res = self.keyboard_event_receiver.try_recv();
             match keyboard_event_recv_res {
@@ -52,11 +56,22 @@ impl Keyboard {
     fn update_keyboard_state(&mut self, keyboard_event: KeyboardEvent) {
         match keyboard_event {
             KeyboardEvent::KeyUp(key) => {
-                self.bitflags &= !((1 << key) as u16);
+                self.bitflags &= !((1u16 << (key as u16)) as u16);
             }
             KeyboardEvent::KeyDown(key) => {
-                self.bitflags |= 1 << key;
+                self.bitflags |= 1 << (key as u16);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Key;
+
+    #[test]
+    fn test_key_assignment(){
+        assert_eq!(0,Key::K0 as u16);
+        assert_eq!(15,Key::KF as u16);
     }
 }

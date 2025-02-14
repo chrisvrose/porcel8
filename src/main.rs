@@ -19,14 +19,12 @@ use crate::args::Porcel8ProgramArgs;
 use crate::device::Device;
 
 use crate::util::EmulatorResult;
-use crate::kb_map::get_key_index;
 use crate::sdl_adapters::sdl_audio_adapter::SdlAudioAdapter;
 use crate::sdl_adapters::sdl_graphics_adapter::SdlGraphicsAdapter;
 use crate::sdl_adapters::sdl_keyboard_adapter::SdlKeyboardAdapter;
 
 mod args;
 mod device;
-mod kb_map;
 mod util;
 mod sdl_adapters;
 mod rom;
@@ -68,15 +66,11 @@ fn main() -> EmulatorResult<()> {
                     device_termination_signal_sender.send(()).expect("Could not send");
                     break 'running;
                 }
-                Event::KeyDown { keycode: Some(x), repeat: false, .. } => {
-                    if let Some(key_val) = get_key_index(x) {
-                        sdl_kb_adapter.send_key_down(key_val)?;
-                    }
+                Event::KeyDown { keycode: Some(keycode), repeat: false, .. } => {
+                    sdl_kb_adapter.process_key_down(keycode)?;
                 }
-                Event::KeyUp { keycode: Some(x), repeat: false, .. } => {
-                    if let Some(key_val) = get_key_index(x) {
-                        sdl_kb_adapter.send_key_up(key_val)?;
-                    }
+                Event::KeyUp { keycode: Some(keycode), repeat: false, .. } => {
+                    sdl_kb_adapter.process_key_up(keycode)?;
                 }
                 _ => {}
             }

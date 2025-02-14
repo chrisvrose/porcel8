@@ -4,6 +4,8 @@ use crate::device::timer::DeviceTimerManager;
 use crate::util::EmulatorResult;
 use rand::random;
 use std::sync::{Arc, Mutex};
+use std::thread::sleep;
+use std::time::Duration;
 
 pub struct Device {
     pub registers: RegisterFile,
@@ -52,15 +54,30 @@ impl Device {
     const FONT_DEFAULT_MEM_LOCATION_END: usize = 0x9F;
     const ROM_START: usize = 0x200;
 
+    // Throttling configuration for cpu
+    const DO_CHIP_CPU_THROTTLING:bool = true;
+    const TARGET_CPU_SPEED_INSTRUCTIONS_PER_SECOND: u64 = 800;
+    const TARGET_CPU_INSTRUCTION_TIME: Duration = Duration::from_millis(1000/Self::TARGET_CPU_SPEED_INSTRUCTIONS_PER_SECOND);
+
     pub fn cycle(&mut self) -> EmulatorResult<()> {
-        self.device_keyboard.update_keyboard()?;
+        let time_start = std::time::Instant::now();
+        self.device_keyboard.update_keyboard_registers()?;
 
         let pc = self.registers.pc as usize;
         let instr_slice = self.memory.get(pc..pc + 2).expect("Failed to get memory");
         self.registers.pc += 2;
 
         let instruction = Instruction::decode_instruction(instr_slice);
-        self.execute_instruction(instruction)
+        self.execute_instruction(instruction)?;
+
+        let instruction_time = time_start.elapsed();
+        let time_left_to_sleep_for_instruction = Self::TARGET_CPU_INSTRUCTION_TIME.checked_sub(instruction_time).unwrap_or(Duration::ZERO);
+        if Self::DO_CHIP_CPU_THROTTLING {
+            log::trace!("Instruction took {:?}, left with {:?}",instruction_time,time_left_to_sleep_for_instruction);
+            sleep(time_left_to_sleep_for_instruction);
+        }
+
+        Ok(())
     }
     /// convert the 2 indices into one
     fn get_framebuffer_index(x: usize, y: usize) -> usize {
