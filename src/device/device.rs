@@ -57,7 +57,7 @@ impl Device {
     // Throttling configuration for cpu
     const DO_CHIP_CPU_THROTTLING:bool = true;
     const TARGET_CPU_SPEED_INSTRUCTIONS_PER_SECOND: u64 = 800;
-    const TARGET_CPU_INSTRUCTION_TIME: Duration = Duration::from_millis(1000/Self::TARGET_CPU_SPEED_INSTRUCTIONS_PER_SECOND);
+    const TARGET_CPU_INSTRUCTION_TIME: Duration = Duration::from_micros(1_000_000/Self::TARGET_CPU_SPEED_INSTRUCTIONS_PER_SECOND);
 
     pub fn cycle(&mut self) -> EmulatorResult<()> {
         let time_start = std::time::Instant::now();
