@@ -186,8 +186,9 @@ impl Instruction {
                 let x = (instruction & 0xf00) >> 8;
                 Instruction::LoadRegistersFromMemory(x as usize)
             }
-            _ => {
-                todo!("Unimplemented instruction")
+            instruction_nibble => {
+                log::error!("Unimplemented instruction with nibble {:?}",instruction_nibble);
+                Instruction::InvalidInstruction
             }
         }
     }

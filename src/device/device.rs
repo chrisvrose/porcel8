@@ -3,6 +3,7 @@ use crate::device::keyboard::Keyboard;
 use crate::device::timer::DeviceTimerManager;
 use crate::util::EmulatorResult;
 use rand::random;
+use rand::seq::IteratorRandom;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
@@ -55,8 +56,8 @@ impl Device {
     const ROM_START: usize = 0x200;
 
     // Throttling configuration for cpu
-    const DO_CHIP_CPU_THROTTLING:bool = true;
-    const TARGET_CPU_SPEED_INSTRUCTIONS_PER_SECOND: u64 = 800;
+    const DO_CHIP_CPU_THROTTLING:bool = false;
+    const TARGET_CPU_SPEED_INSTRUCTIONS_PER_SECOND: u64 = 10000;
     const TARGET_CPU_INSTRUCTION_TIME: Duration = Duration::from_micros(1_000_000/Self::TARGET_CPU_SPEED_INSTRUCTIONS_PER_SECOND);
 
     pub fn cycle(&mut self) -> EmulatorResult<()> {
@@ -64,7 +65,7 @@ impl Device {
         self.device_keyboard.update_keyboard_registers()?;
 
         let pc = self.registers.pc as usize;
-        let instr_slice = self.memory.get(pc..pc + 2).expect("Failed to get memory");
+        let instr_slice = self.memory.get(pc..pc + 2).expect(format!("Failed to get memory at {}",pc).as_str());
         self.registers.pc += 2;
 
         let instruction = Instruction::decode_instruction(instr_slice);
@@ -84,7 +85,6 @@ impl Device {
         y * Self::FRAME_BUFFER_WIDTH + x
     }
     pub fn execute_instruction(&mut self, instruction: Instruction) -> EmulatorResult<()> {
-        // thread::sleep(Duration::from_millis(250));
         log::trace!("Executing {:?}, {:?}", &instruction, &self.registers);
         match instruction {
             Instruction::InvalidInstruction => {
@@ -249,10 +249,19 @@ impl Device {
                 self.registers.i = addn_res;
             }
             Instruction::GetKey(x) => {
-                let key_expected = self.registers.v[x];
-                if !self.device_keyboard.query_key_down(key_expected) {
+                // if !self.device_keyboard.query_key_down(key_expected) {
+                //     self.registers.pc -= 2;
+                // }
+                let mut possible_presses = (0..=0xfu8).filter(|x|{self.device_keyboard.query_key_down(*x)});
+                let pressed = possible_presses.next();
+                if let Some(pressed_key) = pressed {
+
+                    self.registers.v[x] = pressed_key;
+
+                } else{
                     self.registers.pc -= 2;
                 }
+                // let key_expected = self.registers.v[x];
             }
             Instruction::SetIndexToFontCharacter(x) => {
                 let requested_char = self.registers.v[x];

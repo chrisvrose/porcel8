@@ -80,7 +80,7 @@ mod tests {
         let (_sender,receiver) = std::sync::mpsc::sync_channel(1);
         let keyboard = Keyboard::new(receiver);
         assert_no_key_pressed(&keyboard);
-        
+
     }
 
     #[test]
@@ -88,12 +88,12 @@ mod tests {
         let (sender,receiver) = std::sync::mpsc::sync_channel(1);
         let mut keyboard = Keyboard::new(receiver);
         assert_no_key_pressed(&keyboard);
-        
-        
+
+
         sender.try_send(super::KeyboardEvent::KeyDown(Key::K0)).expect("Could not send");
         keyboard.update_keyboard_registers().expect("Could not update keyboard");
-        
-        
+
+
         assert_eq!(1,keyboard.bitflags);
         assert_eq!(true,keyboard.query_key_down(0));
         for i in 1..=0xF {
@@ -101,7 +101,7 @@ mod tests {
         }
 
 
-        
+
         sender.try_send(super::KeyboardEvent::KeyUp(Key::K0)).expect("Could not send");
         keyboard.update_keyboard_registers().expect("Could not update keyboard");
         assert_no_key_pressed(&keyboard);
@@ -114,6 +114,6 @@ mod tests {
         }
     }
 
-    
+
 
 }
