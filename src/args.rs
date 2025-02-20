@@ -13,6 +13,7 @@ pub struct Porcel8ProgramArgs {
         help = "Emulate new behaviour of instructions (As seen in Chip-48 and SuperChip8)",
         default_value_t = true
     )]
+    /// Use updated CHIP-8 behaviours.
     pub new_chip8_behaviour: bool,
     #[arg(
         short='i',
@@ -20,5 +21,12 @@ pub struct Porcel8ProgramArgs {
         help = "Halt on invalid instruction",
         default_value_t = false
     )]
+    /// Halt on finding invalid instruction
     pub halt_on_invalid: bool,
+    /// Enable Instruction Throttling 
+    #[arg(short, default_value_t=true)]
+    pub do_instruction_throttling: bool,
+    /// Target Instructions per second, if throttling is enabled
+    #[arg(short='t',long,default_value_t=5_000u64)]
+    pub ips_throttling_rate: u64
 }

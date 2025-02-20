@@ -1,7 +1,7 @@
 use crate::{device::instruction::Instruction, util::EmulatorError};
 use crate::device::keyboard::Keyboard;
 use crate::device::timer::DeviceTimerManager;
-use crate::util::EmulatorResult;
+use crate::util::{DeviceConfig, EmulatorResult};
 use rand::random;
 use rand::seq::IteratorRandom;
 use std::sync::{Arc, Mutex};
@@ -14,9 +14,8 @@ pub struct Device {
     pub timer: DeviceTimerManager,
     pub stack: Vec<u16>,
     pub frame_buffer: Arc<Mutex<Box<[bool; 64 * 32]>>>,
-    pub new_chip8_mode: bool,
-    pub halt_on_invalid: bool,
     pub device_keyboard: Keyboard,
+    pub device_config: DeviceConfig
 }
 
 impl Device {
@@ -28,8 +27,7 @@ impl Device {
         timer: DeviceTimerManager,
         fb: Arc<Mutex<Box<[bool; Device::FRAME_BUFFER_SIZE]>>>,
         device_keyboard: Keyboard,
-        new_chip8_mode: bool,
-        halt_on_invalid: bool
+        device_config: DeviceConfig
     ) -> Device {
         let memory = vec![0u8; Self::DEVICE_MEMORY_SIZE]
             .into_boxed_slice()
@@ -41,10 +39,9 @@ impl Device {
             memory,
             frame_buffer: fb,
             stack: Vec::with_capacity(16),
-            halt_on_invalid,
             timer,
-            new_chip8_mode,
             device_keyboard,
+            device_config
         }
     }
 }
@@ -54,11 +51,6 @@ impl Device {
     const FONT_DEFAULT_MEM_LOCATION_START: usize = 0x50;
     const FONT_DEFAULT_MEM_LOCATION_END: usize = 0x9F;
     const ROM_START: usize = 0x200;
-
-    // Throttling configuration for cpu
-    const DO_CHIP_CPU_THROTTLING:bool = false;
-    const TARGET_CPU_SPEED_INSTRUCTIONS_PER_SECOND: u64 = 10000;
-    const TARGET_CPU_INSTRUCTION_TIME: Duration = Duration::from_micros(1_000_000/Self::TARGET_CPU_SPEED_INSTRUCTIONS_PER_SECOND);
 
     pub fn cycle(&mut self) -> EmulatorResult<()> {
         let time_start = std::time::Instant::now();
@@ -71,9 +63,9 @@ impl Device {
         let instruction = Instruction::decode_instruction(instr_slice);
         self.execute_instruction(instruction)?;
 
-        let instruction_time = time_start.elapsed();
-        let time_left_to_sleep_for_instruction = Self::TARGET_CPU_INSTRUCTION_TIME.checked_sub(instruction_time).unwrap_or(Duration::ZERO);
-        if Self::DO_CHIP_CPU_THROTTLING {
+        if let Some(throttling_duration) = self.device_config.get_throttling_config() {
+            let instruction_time = time_start.elapsed();
+            let time_left_to_sleep_for_instruction = throttling_duration.checked_sub(instruction_time).unwrap_or(Duration::ZERO);
             log::trace!("Instruction took {:?}, left with {:?}",instruction_time,time_left_to_sleep_for_instruction);
             sleep(time_left_to_sleep_for_instruction);
         }
@@ -89,7 +81,7 @@ impl Device {
         match instruction {
             Instruction::InvalidInstruction => {
                 log::info!("Executing passthrough");
-                if self.halt_on_invalid {
+                if self.device_config.should_halt_on_invalid() {
                     return Err(EmulatorError::IOError("Caught Invalid Instruction".to_string()));
                 }
             },
@@ -152,7 +144,7 @@ impl Device {
                 }
             }
             Instruction::JumpWithOffset(x, num) => {
-                let regnum = if self.new_chip8_mode { x } else { 0 };
+                let regnum = if self.device_config.is_new_chip8() { x } else { 0 };
                 let new_pc = self.registers.v[regnum] as u16 + num;
                 self.registers.pc = new_pc;
             }
@@ -205,7 +197,7 @@ impl Device {
                 self.set_flag_register(!is_overflow);
             }
             Instruction::RShift(x, y) => {
-                if !self.new_chip8_mode {
+                if !self.device_config.is_new_chip8() {
                     self.registers.v[x] = self.registers.v[y];
                 }
                 let val = self.registers.v[x];
@@ -214,7 +206,7 @@ impl Device {
                 self.set_flag_register(bit_carry);
             }
             Instruction::LShift(x, y) => {
-                if !self.new_chip8_mode {
+                if !self.device_config.is_new_chip8() {
                     self.registers.v[x] = self.registers.v[y];
                 }
                 let left = self.registers.v[x];
@@ -239,7 +231,7 @@ impl Device {
                 let reg_value = self.registers.v[x];
                 let index_original = self.registers.i;
                 // newer instruction set requires wrapping on 12 bit overflow, and setting vf
-                let addn_res = if self.new_chip8_mode {
+                let addn_res = if self.device_config.is_new_chip8() {
                     let overflowing = (reg_value as u16 + index_original) >= 0x1000;
                     self.set_flag_register(overflowing);
                     (reg_value as u16 + index_original) % 0x1000
@@ -290,7 +282,7 @@ impl Device {
                 let index = self.registers.i as usize;
                 self.memory[index..=(index + last_reg_to_store)].copy_from_slice(reg_slice);
                 // Old Chip8 used to use i as a incrementing index
-                if !self.new_chip8_mode {
+                if !self.device_config.is_new_chip8() {
                     self.registers.i += last_reg_to_store as u16 + 1;
                 }
             }
@@ -299,7 +291,7 @@ impl Device {
                 let mem_slice = &self.memory[index..=(index + last_reg_to_load)];
                 self.registers.v[0..=last_reg_to_load].copy_from_slice(mem_slice);
                 // Old Chip8 used to use i as a incrementing index
-                if !self.new_chip8_mode {
+                if !self.device_config.is_new_chip8() {
                     self.registers.i += last_reg_to_load as u16 + 1;
                 }
             }

@@ -14,6 +14,7 @@ use sdl2::render::BlendMode;
 
 use sdl2::render::WindowCanvas;
 use simple_logger::SimpleLogger;
+use util::DeviceConfig;
 
 use crate::args::Porcel8ProgramArgs;
 use crate::device::Device;
@@ -33,7 +34,7 @@ const WINDOW_TITLE: &str = "porcel8";
 
 fn main() -> EmulatorResult<()> {
     SimpleLogger::new().with_level(LevelFilter::Info).env().init().unwrap();
-    let Porcel8ProgramArgs { filename, new_chip8_behaviour, draw_scale, halt_on_invalid } = Porcel8ProgramArgs::parse();
+    let Porcel8ProgramArgs { filename, new_chip8_behaviour, draw_scale, halt_on_invalid, do_instruction_throttling, ips_throttling_rate: ipms_throttling_rate } = Porcel8ProgramArgs::parse();
 
     log::info!("Started emulator");
 
@@ -45,8 +46,8 @@ fn main() -> EmulatorResult<()> {
     let (sdl_kb_adapter, device_keyboard) = SdlKeyboardAdapter::new_keyboard();
 
     timer.start();
-
-    let device = Device::new(timer, frame_buffer_for_device, device_keyboard, new_chip8_behaviour, halt_on_invalid);
+    let device_config = DeviceConfig::new(new_chip8_behaviour, halt_on_invalid, do_instruction_throttling, ipms_throttling_rate);
+    let device = Device::new(timer, frame_buffer_for_device, device_keyboard, device_config);
 
     let (device_termination_signal_sender, compute_handle) = start_compute_thread(filename, device)?;
 
@@ -111,8 +112,6 @@ fn start_compute_thread(filename: String, mut device: Device) -> EmulatorResult<
                 panic!("Disconnected");
             }
             device.cycle().expect("Failed to execute");
-            // Put a bit of delay to slow down execution
-            thread::sleep(Duration::from_millis(2))
         }
     })?;
     Ok((device_termination_signal_sender, compute_handle))
