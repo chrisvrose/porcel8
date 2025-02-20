@@ -24,9 +24,9 @@ pub struct Porcel8ProgramArgs {
     /// Halt on finding invalid instruction
     pub halt_on_invalid: bool,
     /// Enable Instruction Throttling 
-    #[arg(short, default_value_t=true)]
+    #[arg(short='t', default_value_t=true)]
     pub do_instruction_throttling: bool,
     /// Target Instructions per second, if throttling is enabled
-    #[arg(short='t',long,default_value_t=5_000u64)]
+    #[arg(short='r',long,default_value_t=750u64)]
     pub ips_throttling_rate: u64
 }
