@@ -7,6 +7,8 @@ use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
 
+use super::registers::RegisterFile;
+
 pub struct Device {
     pub registers: RegisterFile,
     pub memory: Box<[u8; Self::DEVICE_MEMORY_SIZE]>,
@@ -34,7 +36,7 @@ impl Device {
             .unwrap();
         log::trace!("Successfully initiated device memory");
         Device {
-            registers: RegisterFile::new(),
+            registers: RegisterFile::default(),
             memory,
             frame_buffer: fb,
             stack: Vec::with_capacity(16),
@@ -46,10 +48,10 @@ impl Device {
 }
 
 impl Device {
+    pub const ROM_START: usize = 0x200;
     const FONT_HEIGHT: u16 = 5;
     const FONT_DEFAULT_MEM_LOCATION_START: usize = 0x50;
     const FONT_DEFAULT_MEM_LOCATION_END: usize = 0x9F;
-    const ROM_START: usize = 0x200;
 
     pub fn cycle(&mut self) -> EmulatorResult<()> {
         let time_start = std::time::Instant::now();
@@ -240,9 +242,6 @@ impl Device {
                 self.registers.i = addn_res;
             }
             Instruction::GetKey(x) => {
-                // if !self.device_keyboard.query_key_down(key_expected) {
-                //     self.registers.pc -= 2;
-                // }
                 let mut possible_presses = (0..=0xfu8).filter(|x|{self.device_keyboard.query_key_down(*x)});
                 let pressed = possible_presses.next();
                 if let Some(pressed_key) = pressed {
@@ -252,7 +251,6 @@ impl Device {
                 } else{
                     self.registers.pc -= 2;
                 }
-                // let key_expected = self.registers.v[x];
             }
             Instruction::SetIndexToFontCharacter(x) => {
                 let requested_char = self.registers.v[x];
@@ -380,25 +378,5 @@ impl Device {
 impl Drop for Device {
     fn drop(&mut self) {
         self.timer.send_stop_signal()
-    }
-}
-
-#[derive(Debug)]
-pub struct RegisterFile {
-    pub v: [u8; 0x10],
-    /// program counter - only u12 technically.
-    pub pc: u16,
-    /// stack pointer
-    pub i: u16,
-}
-
-impl RegisterFile {
-    pub const DEFAULT_PC_VALUE: u16 = Device::ROM_START as u16;
-    pub fn new() -> RegisterFile {
-        RegisterFile {
-            v: [0; 0x10],
-            pc: Self::DEFAULT_PC_VALUE,
-            i: 0,
-        }
     }
 }
