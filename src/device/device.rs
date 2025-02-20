@@ -3,7 +3,6 @@ use crate::device::keyboard::Keyboard;
 use crate::device::timer::DeviceTimerManager;
 use crate::util::{DeviceConfig, EmulatorResult};
 use rand::random;
-use rand::seq::IteratorRandom;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;

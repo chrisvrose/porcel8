@@ -1,6 +1,7 @@
 use crate::device::keyboard::KeyboardEvent;
 use sdl2::video::WindowBuildError;
 use sdl2::IntegerOrSdlError;
+use std::fmt::Display;
 use std::sync::mpsc::SendError;
 use std::sync::PoisonError;
 use std::time::Duration;
@@ -51,6 +52,21 @@ pub enum EmulatorError {
     MutexInvalidState(String),
 }
 
+impl Display for EmulatorError{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self{
+            EmulatorError::SdlError(err) => write!(f,"Error with SDL: {}",err),
+            EmulatorError::IOError(io_err) => write!(f,"IO Error: {}",io_err),
+            EmulatorError::MutexInvalidState(invalid_mutex_err) => write!(f,"Issue from mutex: {}",invalid_mutex_err),
+        }
+    }
+}
+
+impl From<SendError<()>> for EmulatorError{
+    fn from(value: SendError<()>) -> Self {
+        Self::IOError(String::from("Could not update as: ")+value.to_string().as_str())
+    }
+}
 impl From<String> for EmulatorError {
     fn from(value: String) -> Self {
         Self::SdlError(value)

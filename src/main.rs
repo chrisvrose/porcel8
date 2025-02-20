@@ -2,7 +2,6 @@ use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Sender;
 use std::thread;
 use std::thread::JoinHandle;
-use std::time::Duration;
 use clap::Parser;
 use log::LevelFilter;
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
@@ -66,7 +65,7 @@ fn main() -> EmulatorResult<()> {
             match event {
                 Event::Quit { .. } |
                 Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
-                    device_termination_signal_sender.send(()).expect("Could not send");
+                    device_termination_signal_sender.send(())?;
                     break 'running;
                 }
                 Event::KeyDown { keycode: Some(keycode), repeat: false, .. } => {
